@@ -6,7 +6,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function formatKcal(kcal: number): string {
-  return kcal.toLocaleString('en-US')
+  return kcal.toLocaleString('he-IL')
 }
 
 export function formatKg(kg: number): string {

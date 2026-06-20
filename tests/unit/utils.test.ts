@@ -7,8 +7,8 @@ describe('cn', () => {
   it('deduplicates Tailwind', () => expect(cn('text-red-500', 'text-blue-500')).toBe('text-blue-500'))
 })
 describe('formatKcal', () => {
-  it('comma separator for 2050', () => expect(formatKcal(2050)).toBe('2,050'))
-  it('negative passes through', () => expect(formatKcal(-350)).toBe('-350'))
+  it('hebrew locale separator for 2050', () => expect(formatKcal(2050)).toBe('2,050'))
+  it('hebrew locale negative format', () => expect(formatKcal(-350)).toBe('‎-350'))
 })
 describe('formatKg', () => {
   it('one decimal', () => expect(formatKg(79.2)).toBe('79.2'))
