@@ -1,7 +1,6 @@
 ﻿"""
 Garmin Connect sync — activities, HR, HRV, stress, steps, SpO2, VO2Max.
 Cron: 07:00, 14:00, 21:00 Israel (04:00, 11:00, 18:00 UTC).
-Uses garth session caching to avoid repeated logins (avoids Garmin 429 rate limits).
 """
 import os, sys, time, logging
 from datetime import datetime, timezone, timedelta
@@ -18,33 +17,37 @@ TOKENSTORE = Path("/tmp/garth_tokens")
 
 
 def get_garmin():
-    """Login to Garmin, reusing cached session when available."""
+    """Login to Garmin, reusing cached session when available to avoid rate limits."""
     email    = os.environ["GARMIN_EMAIL"]
     password = os.environ["GARMIN_PASSWORD"]
 
-    # Try reusing cached session first
-    if TOKENSTORE.exists():
+    # Always ensure the tokenstore directory exists
+    TOKENSTORE.mkdir(parents=True, exist_ok=True)
+
+    # Try reusing cached session (token files already in directory)
+    oauth2_file = TOKENSTORE / "oauth2_token.json"
+    if oauth2_file.exists():
         try:
             c = garminconnect.Garmin()
             c.login(tokenstore=str(TOKENSTORE))
             log.info("Garmin session restored from cache")
             return c
-        except Exception:
-            log.info("Cached session expired, re-authenticating...")
-            import shutil
-            shutil.rmtree(str(TOKENSTORE), ignore_errors=True)
+        except Exception as exc:
+            log.info(f"Cached session invalid ({exc}), re-authenticating...")
 
-    # Fresh login with retries
+    # Fresh login — do NOT pass tokenstore here, save separately after
     for attempt in range(3):
         try:
             c = garminconnect.Garmin(email=email, password=password)
-            c.login(tokenstore=str(TOKENSTORE))
-            log.info("Garmin login OK, session cached")
+            c.login()
+            # Save session for future runs
+            c.garth.dump(str(TOKENSTORE))
+            log.info("Garmin login OK, session cached to /tmp/garth_tokens")
             return c
         except Exception as exc:
             if attempt == 2:
                 raise
-            wait = 2 ** attempt * 5  # 5s, 10s
+            wait = 5 * (attempt + 1)
             log.warning(f"Login attempt {attempt+1} failed: {exc}. Retrying in {wait}s...")
             time.sleep(wait)
     raise RuntimeError("Garmin login failed after retries")
