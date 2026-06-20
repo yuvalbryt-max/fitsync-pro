@@ -1,9 +1,11 @@
 ﻿"""
 Garmin Connect sync — activities, HR, HRV, stress, steps, SpO2, VO2Max.
 Cron: 07:00, 14:00, 21:00 Israel (04:00, 11:00, 18:00 UTC).
+Uses garth session caching to avoid repeated logins (avoids Garmin 429 rate limits).
 """
 import os, sys, time, logging
 from datetime import datetime, timezone, timedelta
+from pathlib import Path
 from dotenv import load_dotenv
 import garminconnect
 from db import get_client, get_user_id, log_sync, upsert
@@ -12,19 +14,40 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
 
+TOKENSTORE = Path("/tmp/garth_tokens")
+
 
 def get_garmin():
+    """Login to Garmin, reusing cached session when available."""
+    email    = os.environ["GARMIN_EMAIL"]
+    password = os.environ["GARMIN_PASSWORD"]
+
+    # Try reusing cached session first
+    if TOKENSTORE.exists():
+        try:
+            c = garminconnect.Garmin()
+            c.login(tokenstore=str(TOKENSTORE))
+            log.info("Garmin session restored from cache")
+            return c
+        except Exception:
+            log.info("Cached session expired, re-authenticating...")
+            import shutil
+            shutil.rmtree(str(TOKENSTORE), ignore_errors=True)
+
+    # Fresh login with retries
     for attempt in range(3):
         try:
-            c = garminconnect.Garmin(email=os.environ["GARMIN_EMAIL"],
-                                     password=os.environ["GARMIN_PASSWORD"])
-            c.login()
+            c = garminconnect.Garmin(email=email, password=password)
+            c.login(tokenstore=str(TOKENSTORE))
+            log.info("Garmin login OK, session cached")
             return c
         except Exception as exc:
             if attempt == 2:
                 raise
-            log.warning(f"Login attempt {attempt+1} failed: {exc}")
-            time.sleep(2 ** attempt)
+            wait = 2 ** attempt * 5  # 5s, 10s
+            log.warning(f"Login attempt {attempt+1} failed: {exc}. Retrying in {wait}s...")
+            time.sleep(wait)
+    raise RuntimeError("Garmin login failed after retries")
 
 
 def sync_activities(garmin, db, user_id):
@@ -122,7 +145,6 @@ def main():
     log.info("Starting Garmin sync...")
     try:
         garmin = get_garmin()
-        log.info("Garmin login OK")
     except Exception as exc:
         msg = f"Auth failed: {exc}"
         log.error(msg)
