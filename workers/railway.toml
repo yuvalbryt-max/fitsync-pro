@@ -1,0 +1,31 @@
+﻿[build]
+builder = "nixpacks"
+buildCommand = "pip install -r requirements.txt"
+
+[[services]]
+name = "garmin-sync"
+startCommand = "python garmin_sync.py"
+
+[services.deploy]
+cronSchedule = "0 4,11,18 * * *"
+
+[[services]]
+name = "jefit-sync"
+startCommand = "python jefit_sync.py"
+
+[services.deploy]
+cronSchedule = "10 4,11,18 * * *"
+
+[[services]]
+name = "daily-summary"
+startCommand = "python daily_summary.py"
+
+[services.deploy]
+cronSchedule = "15 18 * * *"
+
+[[services]]
+name = "ai-insight"
+startCommand = "python ai_insight.py"
+
+[services.deploy]
+cronSchedule = "30 4 * * *"
