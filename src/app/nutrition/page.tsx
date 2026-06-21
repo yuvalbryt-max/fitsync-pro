@@ -1,7 +1,7 @@
 ﻿'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import BottomNav from '@/components/layout/BottomNav'
+import { BottomNav } from '@/components/v0-ui/bottom-nav'
 import { formatKcal } from '@/lib/utils'
 
 type NutritionEntry = {
