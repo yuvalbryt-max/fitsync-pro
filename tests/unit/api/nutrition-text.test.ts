@@ -3,6 +3,16 @@ import { describe, it, expect } from 'vitest'
 // ── Inline the pure logic we want to test ──────────────────────────────────
 // (Extracted here to avoid mocking OpenAI/Supabase in unit tests)
 
+// Mirror of detectMime from route.ts
+const MIME_MAP: Record<string, string> = {
+  '/9j/': 'image/jpeg',
+  'iVBO': 'image/png',
+  'UklG': 'image/webp',
+}
+function detectMime(b64: string): string | null {
+  return MIME_MAP[b64.slice(0, 4)] ?? null
+}
+
 type FoodItem = {
   food_name: string; grams: number | null
   kcal: number; protein_g: number; carbs_g: number; fat_g: number
@@ -167,5 +177,36 @@ describe('Input validation constants', () => {
   it('text one char over limit should be rejected', () => {
     const text = 'a'.repeat(MAX_TEXT_LENGTH + 1)
     expect(text.length > MAX_TEXT_LENGTH).toBe(true)
+  })
+})
+
+// ── detectMime (security: MIME validation for image uploads) ─────────────
+describe('detectMime', () => {
+  it('detects JPEG from /9j/ prefix', () => {
+    expect(detectMime('/9j/4AAQSkZJRgABAQAAAQ==')).toBe('image/jpeg')
+  })
+
+  it('detects PNG from iVBO prefix', () => {
+    expect(detectMime('iVBORw0KGgoAAAANSUhEUgAA')).toBe('image/png')
+  })
+
+  it('detects WebP from UklG prefix', () => {
+    expect(detectMime('UklGRlYBAABXRUJQVlA4')).toBe('image/webp')
+  })
+
+  it('returns null for unknown format (PDF)', () => {
+    expect(detectMime('JVBERi0xLjQ=')).toBeNull()
+  })
+
+  it('returns null for empty string', () => {
+    expect(detectMime('')).toBeNull()
+  })
+
+  it('returns null for random text (not an image)', () => {
+    expect(detectMime('aGVsbG8gd29ybGQ=')).toBeNull()
+  })
+
+  it('returns null for string shorter than 4 chars', () => {
+    expect(detectMime('abc')).toBeNull()
   })
 })

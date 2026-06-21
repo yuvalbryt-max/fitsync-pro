@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { BottomNav } from '@/components/v0-ui/bottom-nav'
@@ -12,15 +12,15 @@ type Message = {
 }
 
 const QUICK_PROMPTS = [
-  'כמה קלוריות אכלתי היום?',
-  'מה המאזן הקלורי שלי?',
-  'כמה חלבון אני צריך?',
-  'תן לי טיפ לתזונה',
-  'מה לאכול אחרי אימון?',
+  '׳›׳׳” ׳§׳׳•׳¨׳™׳•׳× ׳׳›׳׳×׳™ ׳”׳™׳•׳?',
+  '׳׳” ׳”׳׳׳–׳ ׳”׳§׳׳•׳¨׳™ ׳©׳׳™?',
+  '׳›׳׳” ׳—׳׳‘׳•׳ ׳׳ ׳™ ׳¦׳¨׳™׳?',
+  '׳×׳ ׳׳™ ׳˜׳™׳₪ ׳׳×׳–׳•׳ ׳”',
+  '׳׳” ׳׳׳›׳•׳ ׳׳—׳¨׳™ ׳׳™׳׳•׳?',
 ]
 
 function renderMarkdown(text: string) {
-  // Simple bold rendering: **text** → <strong>
+  // Simple bold rendering: **text** ג†’ <strong>
   return text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
 }
 
@@ -57,14 +57,14 @@ export default function AiChatPage() {
           setMessages([{
             id: 'welcome',
             role: 'assistant',
-            content: 'שלום! אני המאמן האישי שלך 💪\nאני יכול לענות על שאלות לגבי התזונה, הכושר והנתונים שלך.\nבמה אוכל לעזור היום?',
+            content: '׳©׳׳•׳! ׳׳ ׳™ ׳”׳׳׳׳ ׳”׳׳™׳©׳™ ׳©׳׳ נ’×\n׳׳ ׳™ ׳™׳›׳•׳ ׳׳¢׳ ׳•׳× ׳¢׳ ׳©׳׳׳•׳× ׳׳’׳‘׳™ ׳”׳×׳–׳•׳ ׳”, ׳”׳›׳•׳©׳¨ ׳•׳”׳ ׳×׳•׳ ׳™׳ ׳©׳׳.\n׳‘׳׳” ׳׳•׳›׳ ׳׳¢׳–׳•׳¨ ׳”׳™׳•׳?',
           }])
         }
       } catch {
         setMessages([{
           id: 'welcome',
           role: 'assistant',
-          content: 'שלום! אני המאמן האישי שלך 💪\nשאל אותי כל שאלה על תזונה וכושר.',
+          content: '׳©׳׳•׳! ׳׳ ׳™ ׳”׳׳׳׳ ׳”׳׳™׳©׳™ ׳©׳׳ נ’×\n׳©׳׳ ׳׳•׳×׳™ ׳›׳ ׳©׳׳׳” ׳¢׳ ׳×׳–׳•׳ ׳” ׳•׳›׳•׳©׳¨.',
         }])
       } finally {
         setHistoryLoading(false)
@@ -134,7 +134,7 @@ export default function AiChatPage() {
     setMessages([{
       id: 'welcome-new',
       role: 'assistant',
-      content: 'שיחה חדשה התחילה! במה אוכל לעזור?',
+      content: '׳©׳™׳—׳” ׳—׳“׳©׳” ׳”׳×׳—׳™׳׳”! ׳‘׳׳” ׳׳•׳›׳ ׳׳¢׳–׳•׳¨?',
     }])
   }
 
@@ -148,13 +148,13 @@ export default function AiChatPage() {
           </div>
           <div>
             <h1 className="font-semibold text-sm">AI Coach</h1>
-            <p className="text-[10px] text-[#3d4f65]">Claude Sonnet · מאמן אישי</p>
+            <p className="text-[10px] text-[#3d4f65]">Claude Sonnet ֲ· ׳׳׳׳ ׳׳™׳©׳™</p>
           </div>
         </div>
         <button
           onClick={clearChat}
           className="p-2 rounded-lg text-[#3d4f65] hover:text-white hover:bg-white/5 transition-colors"
-          title="שיחה חדשה"
+          title="׳©׳™׳—׳” ׳—׳“׳©׳”"
         >
           <RefreshCw size={16} />
         </button>
@@ -242,7 +242,7 @@ export default function AiChatPage() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="שאל את המאמן שלך..."
+            placeholder="׳©׳׳ ׳׳× ׳”׳׳׳׳ ׳©׳׳..."
             rows={1}
             disabled={loading || historyLoading}
             className="flex-1 bg-[#111827] border border-white/10 rounded-2xl px-4 py-3 text-sm resize-none focus:outline-none focus:border-[#3b82f6]/50 placeholder:text-[#3d4f65] leading-relaxed max-h-32 overflow-y-auto"
@@ -265,3 +265,4 @@ export default function AiChatPage() {
     </div>
   )
 }
+

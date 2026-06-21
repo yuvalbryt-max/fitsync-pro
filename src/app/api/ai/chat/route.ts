@@ -79,7 +79,8 @@ ${insights.length ? `׳×׳•׳‘׳ ׳•׳× ׳׳—׳¨׳•׳ ׳•׳×
 
     return NextResponse.json({ reply: assistantContent, session_id: sid })
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 })
+    console.error('[ai/chat POST]', err)
+    return NextResponse.json({ error: 'שגיאה בתקשורת עם ה-AI. נסה שוב.' }, { status: 500 })
   }
 }
 
@@ -97,5 +98,6 @@ export async function GET() {
 
   return NextResponse.json((data || []).reverse())
 }
+
 
 

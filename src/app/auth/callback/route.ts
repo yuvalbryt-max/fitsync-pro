@@ -1,8 +1,14 @@
 ﻿import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
+const ALLOWED_ORIGIN = process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL
+  ? `https://${process.env.VERCEL_URL}`
+  : 'http://localhost:3000'
+
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url)
+  const { searchParams } = new URL(request.url)
+  // Use env-configured origin to prevent open redirect via Host header spoofing
+  const origin = process.env.NEXT_PUBLIC_SITE_URL || ALLOWED_ORIGIN
   const code = searchParams.get('code')
 
   if (code) {
@@ -26,4 +32,5 @@ export async function GET(request: Request) {
   }
   return NextResponse.redirect(`${origin}/auth/login?error=auth_failed`)
 }
+
 
