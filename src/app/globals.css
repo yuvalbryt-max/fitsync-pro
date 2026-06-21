@@ -1,7 +1,50 @@
-﻿@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
 @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');
+
+/* Tailwind v4: map utility classes to CSS variables */
+@theme inline {
+  --font-sans: 'Heebo', system-ui, sans-serif;
+
+  --color-background:            var(--background);
+  --color-foreground:            var(--foreground);
+  --color-card:                  var(--card);
+  --color-card-foreground:       var(--card-foreground);
+  --color-primary:               var(--primary);
+  --color-primary-foreground:    var(--primary-foreground);
+  --color-secondary:             var(--secondary);
+  --color-secondary-foreground:  var(--secondary-foreground);
+  --color-muted:                 var(--muted);
+  --color-muted-foreground:      var(--muted-foreground);
+  --color-accent:                var(--accent);
+  --color-accent-foreground:     var(--accent-foreground);
+  --color-destructive:           var(--destructive);
+  --color-border:                var(--border);
+  --color-input:                 var(--input);
+  --color-ring:                  var(--ring);
+
+  --color-brand:                 var(--brand);
+  --color-brand-soft:            var(--brand-soft);
+  --color-amber:                 var(--amber);
+  --color-amber-soft:            var(--amber-soft);
+  --color-purple:                var(--purple);
+  --color-purple-soft:           var(--purple-soft);
+  --color-green:                 var(--green);
+  --color-green-soft:            var(--green-soft);
+  --color-red:                   var(--red);
+  --color-red-soft:              var(--red-soft);
+  --color-pink:                  var(--pink);
+  --color-pink-soft:             var(--pink-soft);
+  --color-teal:                  var(--teal);
+  --color-teal-soft:             var(--teal-soft);
+
+  --border-radius-sm:   calc(var(--radius) * 0.6);
+  --border-radius-md:   calc(var(--radius) * 0.8);
+  --border-radius-lg:   var(--radius);
+  --border-radius-xl:   calc(var(--radius) * 1.4);
+  --border-radius-2xl:  calc(var(--radius) * 1.8);
+  --border-radius-3xl:  calc(var(--radius) * 2.2);
+  --border-radius-4xl:  calc(var(--radius) * 2.6);
+}
 
 :root {
   color-scheme: light;
@@ -10,8 +53,6 @@
   --foreground:           #0f172a;
   --card:                 #ffffff;
   --card-foreground:      #0f172a;
-  --popover:              #ffffff;
-  --popover-foreground:   #0f172a;
   --primary:              #1d4ed8;
   --primary-foreground:   #ffffff;
   --secondary:            #eef2f8;
