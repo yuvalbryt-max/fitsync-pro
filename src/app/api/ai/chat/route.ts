@@ -9,8 +9,16 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { message, session_id } = await request.json()
-  if (!message) return NextResponse.json({ error: 'message is required' }, { status: 400 })
+  let body: { message?: unknown; session_id?: unknown }
+  try { body = await request.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
+  const { message, session_id } = body
+  if (!message || typeof message !== 'string' || !message.trim()) {
+    return NextResponse.json({ error: 'message is required' }, { status: 400 })
+  }
+  if (message.length > 2000) {
+    return NextResponse.json({ error: 'Message too long (max 2000 chars)' }, { status: 400 })
+  }
+  const sessionIdStr = typeof session_id === 'string' ? session_id : null
 
   const today = new Date().toISOString().slice(0, 10)
 
@@ -19,9 +27,9 @@ export async function POST(request: Request) {
     supabase.from('daily_summary').select('*').eq('user_id', user.id).eq('date', today).maybeSingle(),
     supabase.from('ai_insights').select('content,insight_date').eq('user_id', user.id)
       .order('insight_date', { ascending: false }).limit(3),
-    session_id
+    sessionIdStr
       ? supabase.from('chat_messages').select('role,content').eq('user_id', user.id)
-          .eq('session_id', session_id).order('created_at', { ascending: false }).limit(10)
+          .eq('session_id', sessionIdStr).order('created_at', { ascending: false }).limit(10)
       : Promise.resolve({ data: [] }),
   ])
 
@@ -58,8 +66,10 @@ ${insights.length ? `׳×׳•׳‘׳ ׳•׳× ׳׳—׳¨׳•׳ ׳•׳×
       messages,
     })
 
-    const assistantContent = response.content[0].type === 'text' ? response.content[0].text : ''
-    const sid = session_id || crypto.randomUUID()
+    const firstBlock = response.content?.[0]
+    const assistantContent = firstBlock?.type === 'text' ? firstBlock.text : ''
+    if (!assistantContent) throw new Error('Empty response from AI')
+    const sid = sessionIdStr || crypto.randomUUID()
 
     // Save both messages
     await supabase.from('chat_messages').insert([
@@ -87,4 +97,5 @@ export async function GET() {
 
   return NextResponse.json((data || []).reverse())
 }
+
 

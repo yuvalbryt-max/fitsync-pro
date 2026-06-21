@@ -6,13 +6,40 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 const genai  = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY!)
 
+// Input limits
+const MAX_TEXT_LENGTH    = 1000
+const MAX_IMAGE_B64_SIZE = 5 * 1024 * 1024  // 5 MB of base64 chars ג‰ˆ 3.75 MB image
+
 type FoodItem = { food_name: string; grams: number | null; kcal: number; protein_g: number; carbs_g: number; fat_g: number }
 
 const JSON_SCHEMA = `{"items":[{"food_name":"string","grams":number|null,"kcal":number,"protein_g":number,"carbs_g":number,"fat_g":number}]}`
 
+function safeParse(raw: string): FoodItem[] {
+  try {
+    const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+    const parsed = JSON.parse(cleaned)
+    if (!Array.isArray(parsed?.items)) return []
+    return parsed.items.filter(
+      (i: unknown): i is FoodItem => {
+        if (typeof i !== 'object' || i === null) return false
+        const item = i as Record<string, unknown>
+        return (
+          typeof item.food_name === 'string' && item.food_name.length > 0 &&
+          typeof item.kcal      === 'number' && item.kcal      >= 0 &&
+          typeof item.protein_g === 'number' && item.protein_g >= 0 &&
+          typeof item.carbs_g   === 'number' && item.carbs_g   >= 0 &&
+          typeof item.fat_g     === 'number' && item.fat_g     >= 0
+        )
+      }
+    )
+  } catch {
+    return []
+  }
+}
+
 async function analyzeWithGPT4o(text: string, imageBase64?: string): Promise<FoodItem[]> {
   const prompt = imageBase64
-    ? `המשתמש אמר: "${text}"\nהנה תווית תזונה. השתמש בטקסט ובתמונה יחד לחישוב הערכים.\nהחזר JSON בלבד (ללא markdown): ${JSON_SCHEMA}`
+    ? `׳”׳׳©׳×׳׳© ׳׳׳¨: "${text}"\n׳”׳ ׳” ׳×׳•׳•׳™׳× ׳×׳–׳•׳ ׳”. ׳”׳©׳×׳׳© ׳‘׳˜׳§׳¡׳˜ ׳•׳‘׳×׳׳•׳ ׳” ׳™׳—׳“ ׳׳—׳™׳©׳•׳‘ ׳”׳¢׳¨׳›׳™׳.\n׳”׳—׳–׳¨ JSON ׳‘׳׳‘׳“ (׳׳׳ markdown): ${JSON_SCHEMA}`
     : `Parse this food description. Return ONLY JSON: ${JSON_SCHEMA}\nFood: "${text}"`
 
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [{
@@ -29,21 +56,17 @@ async function analyzeWithGPT4o(text: string, imageBase64?: string): Promise<Foo
     model: 'gpt-4o', messages, max_tokens: 600,
     ...(imageBase64 ? {} : { response_format: { type: 'json_object' as const } }),
   })
-  const raw = (completion.choices[0].message.content || '').replace(/```json\n?/g,'').replace(/```\n?/g,'').trim()
-  const parsed = JSON.parse(raw)
-  return parsed.items || []
+  return safeParse(completion.choices[0]?.message?.content ?? '')
 }
 
 async function analyzeWithGemini(text: string, imageBase64: string): Promise<FoodItem[]> {
   const model  = genai.getGenerativeModel({ model: 'gemini-2.0-flash' })
-  const prompt = `המשתמש אמר: "${text}"\nהנה תווית תזונה. השתמש בטקסט ובתמונה יחד לחישוב הערכים.\nהחזר JSON בלבד (ללא markdown): ${JSON_SCHEMA}`
+  const prompt = `׳”׳׳©׳×׳׳© ׳׳׳¨: "${text}"\n׳”׳ ׳” ׳×׳•׳•׳™׳× ׳×׳–׳•׳ ׳”. ׳”׳©׳×׳׳© ׳‘׳˜׳§׳¡׳˜ ׳•׳‘׳×׳׳•׳ ׳” ׳™׳—׳“ ׳׳—׳™׳©׳•׳‘ ׳”׳¢׳¨׳›׳™׳.\n׳”׳—׳–׳¨ JSON ׳‘׳׳‘׳“ (׳׳׳ markdown): ${JSON_SCHEMA}`
   const result = await model.generateContent([
     { inlineData: { mimeType: 'image/jpeg', data: imageBase64 } },
     prompt,
   ])
-  const raw = result.response.text().replace(/```json\n?/g,'').replace(/```\n?/g,'').trim()
-  const parsed = JSON.parse(raw)
-  return parsed.items || []
+  return safeParse(result.response.text())
 }
 
 function mergeResults(gptItems: FoodItem[], geminiItems: FoodItem[]): { items: FoodItem[]; confidence: 'high' | 'medium' } {
@@ -51,7 +74,6 @@ function mergeResults(gptItems: FoodItem[], geminiItems: FoodItem[]): { items: F
   if (geminiItems.length === 0) return { items: gptItems, confidence: 'medium' }
   if (gptItems.length !== geminiItems.length) return { items: gptItems, confidence: 'medium' }
 
-  // Average values from both models
   const merged: FoodItem[] = gptItems.map((g, i) => {
     const gem = geminiItems[i]
     return {
@@ -64,7 +86,6 @@ function mergeResults(gptItems: FoodItem[], geminiItems: FoodItem[]): { items: F
     }
   })
 
-  // Check agreement — if kcal differs by less than 15%, high confidence
   const kcalDiff = Math.abs(gptItems[0].kcal - geminiItems[0].kcal) / Math.max(gptItems[0].kcal, 1)
   return { items: merged, confidence: kcalDiff < 0.15 ? 'high' : 'medium' }
 }
@@ -74,56 +95,78 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { text, imageBase64 } = await request.json()
-  if (!text) return NextResponse.json({ error: 'text required' }, { status: 400 })
+  let body: { text?: unknown; imageBase64?: unknown }
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
+
+  const { text, imageBase64 } = body
+
+  if (!text || typeof text !== 'string' || !text.trim()) {
+    return NextResponse.json({ error: 'text required' }, { status: 400 })
+  }
+  if (text.length > MAX_TEXT_LENGTH) {
+    return NextResponse.json({ error: `text too long (max ${MAX_TEXT_LENGTH} chars)` }, { status: 400 })
+  }
+  if (imageBase64 !== undefined && (typeof imageBase64 !== 'string' || imageBase64.length > MAX_IMAGE_B64_SIZE)) {
+    return NextResponse.json({ error: 'image too large (max ~3.75 MB)' }, { status: 400 })
+  }
 
   try {
     let items: FoodItem[] = []
     let modelUsed = 'gpt-4o'
     let confidence: 'high' | 'medium' = 'medium'
 
-    if (imageBase64) {
-      // Run GPT-4o Vision + Gemini in parallel, merge results
+    if (imageBase64 && typeof imageBase64 === 'string') {
       modelUsed = 'gpt-4o + gemini-2.0-flash'
-      const [gptItems, geminiItems] = await Promise.allSettled([
+      const [gptRes, geminiRes] = await Promise.allSettled([
         analyzeWithGPT4o(text, imageBase64),
         analyzeWithGemini(text, imageBase64),
       ])
-      const gpt    = gptItems.status    === 'fulfilled' ? gptItems.value    : []
-      const gemini = geminiItems.status === 'fulfilled' ? geminiItems.value : []
+      const gpt    = gptRes.status    === 'fulfilled' ? gptRes.value    : []
+      const gemini = geminiRes.status === 'fulfilled' ? geminiRes.value : []
       const result = mergeResults(gpt, gemini)
       items      = result.items
       confidence = result.confidence
     } else {
-      // Text only — GPT-4o
       items = await analyzeWithGPT4o(text)
     }
 
-    const entries = []
-    for (const item of items) {
-      const { data } = await supabase.from('nutrition_entries').insert({
-        user_id:      user.id,
-        food_name:    item.food_name,
-        grams:        item.grams,
-        kcal:         Math.round(item.kcal),
-        protein_g:    item.protein_g,
-        carbs_g:      item.carbs_g,
-        fat_g:        item.fat_g,
-        entry_method: imageBase64 ? 'photo' : 'text',
-        raw_input:    text,
-        ai_model_used: modelUsed,
-      }).select().single()
-      if (data) entries.push(data)
+    if (items.length === 0) {
+      return NextResponse.json({ error: '׳׳ ׳”׳¦׳׳—׳×׳™ ׳׳–׳”׳•׳× ׳׳–׳•׳ ׳‘׳×׳™׳׳•׳¨. ׳ ׳¡׳” ׳׳×׳׳¨ ׳¡׳₪׳¦׳™׳₪׳™׳× ׳™׳•׳×׳¨.' }, { status: 422 })
     }
 
+    // Batch insert (single round-trip instead of N sequential inserts)
+    const rows = items.map(item => ({
+      user_id:       user.id,
+      food_name:     item.food_name.slice(0, 200),
+      grams:         item.grams,
+      kcal:          Math.max(0, Math.round(item.kcal)),
+      protein_g:     Math.max(0, item.protein_g),
+      carbs_g:       Math.max(0, item.carbs_g),
+      fat_g:         Math.max(0, item.fat_g),
+      entry_method:  imageBase64 ? 'photo' : 'text',
+      raw_input:     text.slice(0, 500),
+      ai_model_used: modelUsed,
+    }))
+
+    const { data: entries, error: insertErr } = await supabase
+      .from('nutrition_entries').insert(rows).select()
+    if (insertErr) throw new Error(insertErr.message)
+
     return NextResponse.json({
-      entries,
-      total_kcal: entries.reduce((s: number, e: { kcal: number }) => s + e.kcal, 0),
+      entries: entries ?? [],
+      total_kcal: (entries ?? []).reduce((s: number, e: { kcal: number }) => s + e.kcal, 0),
       model_used: modelUsed,
       confidence,
     }, { status: 201 })
 
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 })
+    // Don't leak internal error details to client
+    console.error('[nutrition/text]', err)
+    return NextResponse.json({ error: '׳©׳’׳™׳׳” ׳‘׳ ׳™׳×׳•׳— ׳”׳׳–׳•׳. ׳ ׳¡׳” ׳©׳•׳‘.' }, { status: 500 })
   }
 }
+

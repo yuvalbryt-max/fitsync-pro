@@ -20,16 +20,20 @@ export default function WeightPage() {
   const [weight, setWeight]   = useState('')
   const [loading, setLoading] = useState(false)
   const [saved, setSaved]     = useState(false)
+  const [error, setError]     = useState<string | null>(null)
 
   const load = useCallback(async () => {
-    const res = await fetch('/api/body/weight')
-    if (res.ok) setMetrics(await res.json())
+    try {
+      const res = await fetch('/api/body/weight')
+      if (res.ok) { setMetrics(await res.json()); setError(null) }
+      else setError('שגיאה בטעינת הנתונים')
+    } catch { setError('בעיית חיבור — נסה לרענן') }
   }, [])
 
   useEffect(() => { load() }, [load])
 
   async function submitWeight(e: React.FormEvent) {
-    e.preventDefault()
+    e.preventDefault(); setError(null)
     setLoading(true)
     const res = await fetch('/api/body/weight', {
       method: 'POST',
@@ -39,6 +43,9 @@ export default function WeightPage() {
     if (res.ok) {
       setSaved(true); setWeight(''); await load()
       setTimeout(() => setSaved(false), 3000)
+    } else {
+      const d = await res.json().catch(() => ({}))
+      setError(d?.error || 'שגיאה בשמירת המשקל')
     }
     setLoading(false)
   }
@@ -135,4 +142,5 @@ export default function WeightPage() {
     </div>
   )
 }
+
 

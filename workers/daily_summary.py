@@ -41,7 +41,7 @@ def main():
                            age_from(profile.get("birth_date")), profile.get("gender") or "male")
 
     acts = (db.table("activities").select("calories").eq("user_id", user_id)
-            .gte("started_at", today + "T00:00:00").lt("started_at", today + "T23:59:59")
+            .gte("started_at", today + "T00:00:00").lt("started_at", today + "T23:59:59.999+00:00")
             .execute()).data or []
     active_kcal = sum(int(a.get("calories") or 0) for a in acts)
 
@@ -52,7 +52,7 @@ def main():
 
     nut = (db.table("nutrition_entries").select("kcal,protein_g,carbs_g,fat_g")
            .eq("user_id", user_id).gte("logged_at", today + "T00:00:00")
-           .lt("logged_at", today + "T23:59:59").execute()).data or []
+           .lt("logged_at", today + "T23:59:59.999+00:00").execute()).data or []
     consumed  = sum(int(r.get("kcal") or 0) for r in nut)
     protein_g = int(sum(float(r.get("protein_g") or 0) for r in nut))
     carbs_g   = int(sum(float(r.get("carbs_g") or 0) for r in nut))
@@ -72,3 +72,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

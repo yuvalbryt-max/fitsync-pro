@@ -38,12 +38,18 @@ export default function NutritionPage() {
   const [memoryLoading, setMemoryLoading] = useState(false)
   const [selectedMemory, setSelectedMemory] = useState<MemoryItem | null>(null)
 
+  const [fetchError, setFetchError] = useState<string | null>(null)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+
   // Manual tab
   const [form, setForm] = useState({ food_name: '', kcal: '', protein_g: '', carbs_g: '', fat_g: '' })
 
   const fetchEntries = useCallback(async () => {
-    const res = await fetch('/api/nutrition/manual')
-    if (res.ok) setEntries(await res.json())
+    try {
+      const res = await fetch('/api/nutrition/manual')
+      if (res.ok) { setEntries(await res.json()); setFetchError(null) }
+      else setFetchError('שגיאה בטעינת הרשומות')
+    } catch { setFetchError('בעיית חיבור — נסה לרענן') }
   }, [])
 
   useEffect(() => { fetchEntries() }, [fetchEntries])
@@ -133,21 +139,29 @@ export default function NutritionPage() {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: textInput, imageBase64: imageB64 }),
     })
+    const data = await res.json()
     if (res.ok) {
-      const data = await res.json()
-      setTextResult(data); await fetchEntries()
+      setTextResult(data); setSubmitError(null); await fetchEntries()
       setTextInput(''); clearImage(); setSelectedMemory(null)
+    } else {
+      setSubmitError(data?.error || 'שגיאה בניתוח המזון')
     }
     setLoading(false)
   }
 
   async function submitManual(e: React.FormEvent) {
-    e.preventDefault(); setLoading(true)
+    e.preventDefault(); setLoading(true); setSubmitError(null)
     const res = await fetch('/api/nutrition/manual', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ food_name: form.food_name, kcal: form.kcal, protein_g: form.protein_g || undefined, carbs_g: form.carbs_g || undefined, fat_g: form.fat_g || undefined }),
     })
-    if (res.ok) { setForm({ food_name: '', kcal: '', protein_g: '', carbs_g: '', fat_g: '' }); await fetchEntries(); setActiveTab('log') }
+    if (res.ok) {
+      setForm({ food_name: '', kcal: '', protein_g: '', carbs_g: '', fat_g: '' })
+      await fetchEntries(); setActiveTab('log')
+    } else {
+      const d = await res.json().catch(() => ({}))
+      setSubmitError(d?.error || 'שגיאה בשמירת הרשומה')
+    }
     setLoading(false)
   }
 
@@ -170,6 +184,12 @@ export default function NutritionPage() {
       </div>
 
       <div className="flex-1 px-4 pb-4 space-y-3">
+        {fetchError && (
+          <div className="bg-[#3b0a0a] border border-[#f43f5e] rounded-xl px-4 py-3 text-[#f43f5e] text-sm">{fetchError}</div>
+        )}
+        {submitError && (
+          <div className="bg-[#3b0a0a] border border-[#f43f5e] rounded-xl px-4 py-3 text-[#f43f5e] text-sm">{submitError}</div>
+        )}
         {/* Daily totals */}
         <div className="bg-[#0f1520] border border-[#1c2535] border-t-2 border-t-[#10b981] rounded-2xl p-4">
           <p className="text-[10px] text-[#8896aa] font-semibold uppercase tracking-wide mb-2">סה״כ היום</p>
@@ -371,4 +391,6 @@ export default function NutritionPage() {
     </div>
   )
 }
+
+
 
