@@ -9,7 +9,16 @@ type NutritionEntry = {
   protein_g: number | null; carbs_g: number | null; fat_g: number | null
   entry_method: string; logged_at: string
 }
+type MemoryItem = {
+  food_name: string; kcal: number; protein_g: number
+  carbs_g: number; fat_g: number; grams: number | null; count: number
+}
 type Tab = 'log' | 'text' | 'manual'
+
+function debounce<T extends (...args: Parameters<T>) => void>(fn: T, delay: number) {
+  let timer: ReturnType<typeof setTimeout>
+  return (...args: Parameters<T>) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), delay) }
+}
 
 export default function NutritionPage() {
   const [activeTab, setActiveTab] = useState<Tab>('log')
@@ -17,11 +26,17 @@ export default function NutritionPage() {
   const [loading, setLoading]     = useState(false)
 
   // Text + photo tab
-  const [textInput, setTextInput]   = useState('')
-  const [imageB64, setImageB64]     = useState<string | null>(null)
+  const [textInput, setTextInput]     = useState('')
+  const [imageB64, setImageB64]       = useState<string | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
-  const [textResult, setTextResult] = useState<{ entries: NutritionEntry[]; total_kcal: number; model_used: string } | null>(null)
+  const [textResult, setTextResult]   = useState<{ entries: NutritionEntry[]; total_kcal: number; model_used: string; confidence?: string } | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+
+  // Memory system
+  const [memoryItems, setMemoryItems]     = useState<MemoryItem[]>([])
+  const [showMemory, setShowMemory]       = useState(false)
+  const [memoryLoading, setMemoryLoading] = useState(false)
+  const [selectedMemory, setSelectedMemory] = useState<MemoryItem | null>(null)
 
   // Manual tab
   const [form, setForm] = useState({ food_name: '', kcal: '', protein_g: '', carbs_g: '', fat_g: '' })
@@ -40,6 +55,36 @@ export default function NutritionPage() {
     fat_g:     acc.fat_g     + (e.fat_g      || 0),
   }), { kcal: 0, protein_g: 0, carbs_g: 0, fat_g: 0 })
 
+  // Debounced memory search
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const searchMemory = useCallback(debounce(async (q: string) => {
+    if (q.length < 2) { setMemoryItems([]); setShowMemory(false); return }
+    setMemoryLoading(true)
+    const res = await fetch(`/api/nutrition/memory?q=${encodeURIComponent(q)}`)
+    if (res.ok) {
+      const data = await res.json()
+      setMemoryItems(data)
+      setShowMemory(data.length > 0)
+    }
+    setMemoryLoading(false)
+  }, 600), [])
+
+  function handleTextChange(val: string) {
+    setTextInput(val)
+    setSelectedMemory(null)
+    if (!imageB64) searchMemory(val)  // Only search memory when no image
+  }
+
+  function selectMemoryItem(item: MemoryItem) {
+    setSelectedMemory(item)
+    setShowMemory(false)
+  }
+
+  function clearMemorySelection() {
+    setSelectedMemory(null)
+    setShowMemory(false)
+  }
+
   function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -47,8 +92,8 @@ export default function NutritionPage() {
     reader.onload = ev => {
       const dataUrl = ev.target?.result as string
       setImagePreview(dataUrl)
-      // Strip the data URL prefix to get pure base64
       setImageB64(dataUrl.split(',')[1])
+      setShowMemory(false)  // Hide memory when image selected
     }
     reader.readAsDataURL(file)
   }
@@ -61,15 +106,37 @@ export default function NutritionPage() {
   async function submitText(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true); setTextResult(null)
+
+    // If user selected a memory item, save directly without AI
+    if (selectedMemory && !imageB64) {
+      const res = await fetch('/api/nutrition/manual', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          food_name: selectedMemory.food_name,
+          kcal:      selectedMemory.kcal,
+          protein_g: selectedMemory.protein_g,
+          carbs_g:   selectedMemory.carbs_g,
+          fat_g:     selectedMemory.fat_g,
+          grams:     selectedMemory.grams,
+        }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setTextResult({ entries: [data], total_kcal: data.kcal, model_used: 'זיכרון מוצר', confidence: 'high' })
+        await fetchEntries(); setTextInput(''); setSelectedMemory(null)
+      }
+      setLoading(false); return
+    }
+
+    // Otherwise call AI
     const res = await fetch('/api/nutrition/text', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: textInput, imageBase64: imageB64 }),
     })
     if (res.ok) {
       const data = await res.json()
       setTextResult(data); await fetchEntries()
-      setTextInput(''); clearImage()
+      setTextInput(''); clearImage(); setSelectedMemory(null)
     }
     setLoading(false)
   }
@@ -103,7 +170,7 @@ export default function NutritionPage() {
       </div>
 
       <div className="flex-1 px-4 pb-4 space-y-3">
-        {/* Daily totals — always visible */}
+        {/* Daily totals */}
         <div className="bg-[#0f1520] border border-[#1c2535] border-t-2 border-t-[#10b981] rounded-2xl p-4">
           <p className="text-[10px] text-[#8896aa] font-semibold uppercase tracking-wide mb-2">סה״כ היום</p>
           <div className="flex items-baseline gap-2 mb-3">
@@ -136,7 +203,7 @@ export default function NutritionPage() {
                     <p className="font-semibold text-[14px]">{entry.food_name}</p>
                     <p className="text-[11px] text-[#8896aa] mt-0.5">
                       {new Date(entry.logged_at).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}
-                      {' · '}{entry.entry_method === 'text' ? 'מלל' : entry.entry_method === 'photo' ? 'מלל+תמונה' : 'ידני'}
+                      {' · '}{entry.entry_method === 'text' ? 'AI' : entry.entry_method === 'photo' ? 'AI + תמונה' : 'ידני'}
                     </p>
                   </div>
                   <div className="text-left">
@@ -152,67 +219,113 @@ export default function NutritionPage() {
         {/* TEXT + PHOTO TAB */}
         {activeTab === 'text' && (
           <form onSubmit={submitText} className="space-y-3">
-            <div>
+            <div className="relative">
               <label className={labelCls}>תאר מה אכלת</label>
-              <textarea value={textInput} onChange={e => setTextInput(e.target.value)}
+              <textarea value={textInput} onChange={e => handleTextChange(e.target.value)}
                 placeholder="לדוגמא: אכלתי מוצרלה 100 גרם" rows={3} required
                 className={`${inputCls} resize-none`} />
-            </div>
-
-            {/* Image upload area */}
-            <div>
-              <label className={labelCls}>תמונת תווית תזונה (אופציונלי)</label>
-              {imagePreview ? (
-                <div className="relative">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={imagePreview} alt="תווית" className="w-full max-h-48 object-contain rounded-xl border border-[#1c2535] bg-[#0f1520]" />
-                  <button type="button" onClick={clearImage}
-                    className="absolute top-2 left-2 w-7 h-7 rounded-full bg-[#f43f5e] flex items-center justify-center text-white text-xs font-bold">
-                    ✕
-                  </button>
-                  <div className="absolute bottom-2 right-2 bg-[#10b981] text-black text-[10px] font-bold px-2 py-0.5 rounded-full">
-                    Gemini ינתח ✓
-                  </div>
-                </div>
-              ) : (
-                <button type="button" onClick={() => fileRef.current?.click()}
-                  className="w-full border-2 border-dashed border-[#1c2535] rounded-xl py-8 flex flex-col items-center gap-2 text-[#8896aa] hover:border-[#3b82f6] hover:text-[#3b82f6] transition-colors">
-                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                    <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
-                    <circle cx="12" cy="13" r="4"/>
-                  </svg>
-                  <span className="text-[12px] font-semibold">צלם או העלה תווית</span>
-                  <span className="text-[10px]">Gemini ינתח את הערכים התזונתיים</span>
-                </button>
+              {memoryLoading && (
+                <span className="absolute top-8 left-4 text-[10px] text-[#8896aa]">מחפש בזיכרון...</span>
               )}
-              <input ref={fileRef} type="file" accept="image/*" capture="environment"
-                onChange={handleImageSelect} className="hidden" />
             </div>
 
-            {imageB64 && (
-              <div className="bg-[#2d1a52] border border-[#5b3aac] rounded-xl px-3 py-2 flex items-center gap-2">
-                <span className="text-[#8b5cf6] text-[10px] font-bold uppercase">✦ Gemini Vision</span>
-                <span className="text-[#c8d4e4] text-[11px]">ינתח מלל + תמונה יחד</span>
+            {/* Memory suggestions */}
+            {showMemory && !selectedMemory && (
+              <div className="bg-[#0f1520] border border-[#2d1a52] rounded-xl overflow-hidden">
+                <div className="px-3 py-2 bg-[#2d1a52]/40 flex items-center gap-2">
+                  <span className="text-[9px] font-bold text-[#8b5cf6] uppercase">✦ זוכר מוצרים דומים</span>
+                </div>
+                {memoryItems.map((item, i) => (
+                  <button key={i} type="button" onClick={() => selectMemoryItem(item)}
+                    className="w-full px-3 py-3 flex items-center justify-between hover:bg-[#131a25] transition-colors border-t border-[#1c2535] first:border-0 text-right">
+                    <div>
+                      <p className="text-[13px] font-semibold text-[#e8edf5]">{item.food_name}</p>
+                      <p className="text-[10px] text-[#8896aa] mt-0.5">
+                        {item.protein_g}g חלבון · {item.carbs_g}g פחמימות · {item.fat_g}g שומן
+                        {item.grams ? ` · ${item.grams}g` : ''}
+                        {item.count > 1 ? ` · ${item.count} פעמים קודמות` : ''}
+                      </p>
+                    </div>
+                    <div className="text-left flex-shrink-0 mr-2">
+                      <p className="text-[14px] font-bold tabular text-[#8b5cf6]">{formatKcal(item.kcal)}</p>
+                      <p className="text-[9px] text-[#8896aa]">קל׳</p>
+                    </div>
+                  </button>
+                ))}
+                <button type="button" onClick={clearMemorySelection}
+                  className="w-full px-3 py-3 text-right text-[12px] text-[#8896aa] hover:bg-[#131a25] transition-colors border-t border-[#1c2535]">
+                  אף אחת מהן — תנתח עם AI
+                </button>
               </div>
             )}
 
-            {!imageB64 && (
-              <div className="bg-[#1d3461] border border-[#2555a0] rounded-xl px-3 py-2 flex items-center gap-2">
-                <span className="text-[#3b82f6] text-[10px] font-bold uppercase">GPT-4o</span>
-                <span className="text-[#c8d4e4] text-[11px]">ינתח את הטקסט</span>
+            {/* Selected memory badge */}
+            {selectedMemory && (
+              <div className="bg-[#2d1a52] border border-[#5b3aac] rounded-xl px-4 py-3 flex items-center justify-between">
+                <div>
+                  <p className="text-[11px] text-[#8b5cf6] font-bold mb-0.5">✦ ממוצר שמור בזיכרון</p>
+                  <p className="text-[13px] font-semibold">{selectedMemory.food_name}</p>
+                  <p className="text-[10px] text-[#8896aa] mt-0.5">{formatKcal(selectedMemory.kcal)} קל׳ · {selectedMemory.protein_g}g חלבון</p>
+                </div>
+                <button type="button" onClick={() => { setSelectedMemory(null); setShowMemory(true) }}
+                  className="text-[#8896aa] text-[12px] hover:text-[#e8edf5] transition-colors mr-2">
+                  שנה
+                </button>
+              </div>
+            )}
+
+            {/* Image upload */}
+            {!selectedMemory && (
+              <div>
+                <label className={labelCls}>תמונת תווית תזונה (אופציונלי)</label>
+                {imagePreview ? (
+                  <div className="relative">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={imagePreview} alt="תווית" className="w-full max-h-48 object-contain rounded-xl border border-[#1c2535] bg-[#0f1520]" />
+                    <button type="button" onClick={clearImage}
+                      className="absolute top-2 left-2 w-7 h-7 rounded-full bg-[#f43f5e] flex items-center justify-center text-white text-xs font-bold">✕</button>
+                    <div className="absolute bottom-2 right-2 bg-[#10b981] text-black text-[10px] font-bold px-2 py-0.5 rounded-full">GPT-4o + Gemini ✓</div>
+                  </div>
+                ) : (
+                  <button type="button" onClick={() => fileRef.current?.click()}
+                    className="w-full border-2 border-dashed border-[#1c2535] rounded-xl py-7 flex flex-col items-center gap-2 text-[#8896aa] hover:border-[#3b82f6] hover:text-[#3b82f6] transition-colors">
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                      <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+                      <circle cx="12" cy="13" r="4"/>
+                    </svg>
+                    <span className="text-[12px] font-semibold">צלם או העלה תווית</span>
+                    <span className="text-[10px]">GPT-4o + Gemini ינתחו יחד לדיוק מרבי</span>
+                  </button>
+                )}
+                <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={handleImageSelect} className="hidden" />
+              </div>
+            )}
+
+            {/* Model indicator */}
+            {!selectedMemory && (
+              <div className={`border rounded-xl px-3 py-2 flex items-center gap-2 ${imageB64 ? 'bg-[#2d1a52] border-[#5b3aac]' : 'bg-[#1d3461] border-[#2555a0]'}`}>
+                <span className={`text-[10px] font-bold uppercase ${imageB64 ? 'text-[#8b5cf6]' : 'text-[#3b82f6]'}`}>
+                  {imageB64 ? 'GPT-4o Vision + Gemini' : 'GPT-4o'}
+                </span>
+                <span className="text-[#c8d4e4] text-[11px]">
+                  {imageB64 ? 'שני מודלים מנתחים יחד — ממוצע לדיוק מרבי' : 'מנתח מלל חופשי'}
+                </span>
               </div>
             )}
 
             <button type="submit" disabled={loading || !textInput}
               className="w-full bg-[#3b82f6] hover:bg-[#2563eb] disabled:opacity-50 text-white font-semibold py-3 rounded-xl transition-colors">
-              {loading ? 'מנתח...' : imageB64 ? 'נתח מלל + תמונה' : 'נתח טקסט'}
+              {loading ? 'מנתח...' : selectedMemory ? 'שמור מזיכרון' : imageB64 ? 'נתח מלל + תמונה' : 'נתח טקסט'}
             </button>
 
             {textResult && (
               <div className="bg-[#0d3326] border border-[#0a5e40] rounded-xl p-4">
-                <div className="flex items-center gap-2 mb-2">
+                <div className="flex items-center gap-2 mb-2 flex-wrap">
                   <p className="text-[#10b981] font-bold">נוסף ליומן ✓</p>
-                  <span className="text-[9px] bg-[#0a5e40] text-[#10b981] px-2 py-0.5 rounded-full font-bold uppercase">{textResult.model_used}</span>
+                  <span className="text-[9px] bg-[#0a5e40] text-[#10b981] px-2 py-0.5 rounded-full font-bold">{textResult.model_used}</span>
+                  {textResult.confidence === 'high' && (
+                    <span className="text-[9px] bg-[#1d3461] text-[#3b82f6] px-2 py-0.5 rounded-full font-bold">דיוק גבוה ✓</span>
+                  )}
                 </div>
                 {textResult.entries.map((e: NutritionEntry, i: number) => (
                   <div key={i} className="flex justify-between text-sm py-1">
@@ -233,21 +346,17 @@ export default function NutritionPage() {
           <form onSubmit={submitManual} className="space-y-3">
             <div>
               <label className={labelCls}>שם המוצר *</label>
-              <input value={form.food_name} onChange={e => setForm(p=>({...p,food_name:e.target.value}))}
-                placeholder="קוטג׳ 5%" required className={inputCls} />
+              <input value={form.food_name} onChange={e => setForm(p=>({...p,food_name:e.target.value}))} placeholder="קוטג׳ 5%" required className={inputCls} />
             </div>
             <div>
               <label className={labelCls}>קלוריות *</label>
-              <input type="number" value={form.kcal} onChange={e => setForm(p=>({...p,kcal:e.target.value}))}
-                placeholder="350" required min="0" className={inputCls} />
+              <input type="number" value={form.kcal} onChange={e => setForm(p=>({...p,kcal:e.target.value}))} placeholder="350" required min="0" className={inputCls} />
             </div>
             <div className="grid grid-cols-3 gap-2">
               {[['protein_g','חלבון (g)'],['carbs_g','פחמימות (g)'],['fat_g','שומן (g)']].map(([k,l]) => (
                 <div key={k}>
                   <label className={labelCls}>{l}</label>
-                  <input type="number" value={form[k as keyof typeof form]}
-                    onChange={e => setForm(p=>({...p,[k]:e.target.value}))}
-                    placeholder="0" min="0" step="0.1" className={inputCls} />
+                  <input type="number" value={form[k as keyof typeof form]} onChange={e => setForm(p=>({...p,[k]:e.target.value}))} placeholder="0" min="0" step="0.1" className={inputCls} />
                 </div>
               ))}
             </div>
