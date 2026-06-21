@@ -2,51 +2,70 @@
 const fs    = require('fs');
 const path  = require('path');
 
-fs.mkdirSync(path.join(__dirname, 'public', 'icons'), { recursive: true });
-
-// Fitness app icon — dark background + gradient barbell
-const svgIcon = `<svg width="512" height="512" xmlns="http://www.w3.org/2000/svg">
-  <rect width="512" height="512" rx="110" fill="#0a0e1a"/>
+// Professional FitSync Pro icon
+// Inspired by Apple Fitness rings + clean monogram
+const svg = `<svg width="512" height="512" xmlns="http://www.w3.org/2000/svg">
   <defs>
+    <!-- Deep blue gradient background -->
     <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#1d3461" stop-opacity="0.6"/>
-      <stop offset="100%" stop-color="#2d1a52" stop-opacity="0.6"/>
+      <stop offset="0%"   stop-color="#1E3A8A"/>
+      <stop offset="50%"  stop-color="#1D4ED8"/>
+      <stop offset="100%" stop-color="#2563EB"/>
     </linearGradient>
-    <linearGradient id="bar" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#3b82f6"/>
-      <stop offset="100%" stop-color="#8b5cf6"/>
-    </linearGradient>
+    <!-- Shine overlay -->
+    <radialGradient id="shine" cx="35%" cy="25%" r="60%">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.18)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+    </radialGradient>
+    <!-- Glow for rings -->
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
   </defs>
-  <rect x="40" y="40" width="432" height="432" rx="80" fill="url(#bg)"/>
 
-  <!-- Barbell center bar -->
-  <rect x="156" y="236" width="200" height="40" rx="8" fill="url(#bar)"/>
+  <!-- Rounded square background -->
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <!-- Shine -->
+  <rect width="512" height="512" rx="112" fill="url(#shine)"/>
 
-  <!-- Left weights -->
-  <rect x="96"  y="196" width="36" height="120" rx="10" fill="#3b82f6"/>
-  <rect x="120" y="176" width="36" height="160" rx="10" fill="#2563eb"/>
+  <!-- Activity rings (top-right decoration, like Apple Watch) -->
+  <!-- Outer ring -->
+  <circle cx="370" cy="142" r="68" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="16" stroke-linecap="round"/>
+  <circle cx="370" cy="142" r="68" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="16" stroke-linecap="round"
+    stroke-dasharray="290 142" transform="rotate(-90 370 142)"/>
+  <!-- Middle ring -->
+  <circle cx="370" cy="142" r="48" fill="none" stroke="rgba(255,255,255,0.10)" stroke-width="14" stroke-linecap="round"/>
+  <circle cx="370" cy="142" r="48" fill="none" stroke="rgba(255,255,255,0.40)" stroke-width="14" stroke-linecap="round"
+    stroke-dasharray="215 86" transform="rotate(-90 370 142)"/>
+  <!-- Inner ring -->
+  <circle cx="370" cy="142" r="30" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="12" stroke-linecap="round"/>
+  <circle cx="370" cy="142" r="30" fill="none" stroke="rgba(255,255,255,0.30)" stroke-width="12" stroke-linecap="round"
+    stroke-dasharray="135 54" transform="rotate(-90 370 142)"/>
 
-  <!-- Right weights -->
-  <rect x="380" y="196" width="36" height="120" rx="10" fill="#8b5cf6"/>
-  <rect x="356" y="176" width="36" height="160" rx="10" fill="#7c3aed"/>
+  <!-- Bold "F" monogram — large, geometric, clean -->
+  <!-- Vertical bar -->
+  <rect x="108" y="158" width="62" height="262" rx="31" fill="white"/>
+  <!-- Top horizontal bar — full width -->
+  <rect x="108" y="158" width="230" height="58" rx="29" fill="white"/>
+  <!-- Middle bar — shorter -->
+  <rect x="108" y="264" width="178" height="52" rx="26" fill="white"/>
 
-  <!-- Left collar -->
-  <rect x="152" y="210" width="20" height="92" rx="6" fill="#60a5fa"/>
-  <!-- Right collar -->
-  <rect x="340" y="210" width="20" height="92" rx="6" fill="#a78bfa"/>
-
-  <!-- Subtle glow -->
-  <ellipse cx="256" cy="256" rx="180" ry="40" fill="url(#bar)" opacity="0.08"/>
+  <!-- Heartbeat pulse line below F -->
+  <path d="M 88 420 L 148 420 L 178 348 L 216 492 L 254 380 L 288 420 L 424 420"
+    stroke="rgba(255,255,255,0.72)" stroke-width="18"
+    fill="none" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
 </svg>`;
 
-async function makeIcon(size) {
-  await sharp(Buffer.from(svgIcon))
-    .resize(size, size)
-    .png({ quality: 95, compressionLevel: 9 })
-    .toFile(path.join(__dirname, 'public', 'icons', `icon-${size}.png`));
-  console.log(`icon-${size}.png created`);
-}
+const buf = Buffer.from(svg);
 
-Promise.all([makeIcon(192), makeIcon(512), makeIcon(180), makeIcon(32), makeIcon(16)])
-  .then(() => console.log('All icons generated!'))
-  .catch(console.error);
+(async () => {
+  const sizes = [16, 32, 180, 192, 512];
+  for (const s of sizes) {
+    await sharp(buf).resize(s, s).png({ quality: 98 }).toFile(
+      path.join('C:/Users/yuval/My Claude/fitsync-pro/public/icons', `icon-${s}.png`)
+    );
+    console.log(`✓ icon-${s}.png`);
+  }
+  console.log('All icons generated!');
+})();
