@@ -191,7 +191,7 @@ export default function NutritionPage() {
         {activeTab === 'log' && (
           entries.length === 0 ? (
             <div className="text-center py-12 text-[#8896aa]">
-              <p className="text-4xl mb-3">🥗</p>
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#3d4f65" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mb-3 mx-auto" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
               <p className="font-semibold">אין רשומות להיום</p>
               <p className="text-sm mt-1">הוסף ארוחה באמצעות הטאבים למעלה</p>
             </div>
@@ -371,3 +371,4 @@ export default function NutritionPage() {
     </div>
   )
 }
+
