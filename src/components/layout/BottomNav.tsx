@@ -15,15 +15,23 @@ const NAV_ITEMS = [
 export default function BottomNav() {
   const pathname = usePathname()
   return (
-    <nav className="sticky bottom-0 bg-gradient-to-t from-[#080c14] via-[#080c14]/90 to-transparent pt-4 pb-5" aria-label="ניווט ראשי">
+    <nav
+      className="sticky bottom-0 bg-gradient-to-t from-[#080c14] via-[#080c14]/95 to-transparent pt-3"
+      style={{ paddingBottom: 'max(20px, env(safe-area-inset-bottom))' }}
+      aria-label="ניווט ראשי"
+    >
       <div className="flex justify-around items-center">
         {NAV_ITEMS.map(({ href, label, Icon }) => {
           const active = pathname===href || (href!=='/'&&pathname.startsWith(href))
           return (
             <Link key={href} href={href}
-              className={cn('flex flex-col items-center gap-1 px-3 py-1.5 rounded-xl transition-colors', active?'text-[#3b82f6]':'text-[#3d4f65]')}
-              aria-current={active?'page':undefined}>
-              <Icon size={22} strokeWidth={active?2.5:2} aria-hidden="true"/>
+              className={cn(
+                'flex flex-col items-center gap-1 px-3 py-2 rounded-xl',
+                'transition-all duration-150 active:scale-90',
+                active ? 'text-[#3b82f6]' : 'text-[#3d4f65]'
+              )}
+              aria-current={active ? 'page' : undefined}>
+              <Icon size={22} strokeWidth={active ? 2.5 : 2} aria-hidden="true"/>
               <span className="text-[9px] font-semibold">{label}</span>
               {active && <div className="w-1 h-1 rounded-full bg-[#3b82f6]"/>}
             </Link>

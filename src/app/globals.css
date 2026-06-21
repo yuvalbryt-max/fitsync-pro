@@ -1,30 +1,34 @@
-@tailwind base;
+﻿@tailwind base;
 @tailwind components;
 @tailwind utilities;
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap');
 
 :root {
   --font-jakarta: 'Plus Jakarta Sans', sans-serif;
-  --font-inter: 'Inter', sans-serif;
-  --bg-base: #080c14;
-  --bg-card: #0f1520;
-  --bg-card2: #131a25;
-  --border: #1c2535;
-  --border-soft: #151e2d;
+  --font-inter:   'Inter', sans-serif;
+  --bg-base:      #080c14;
+  --bg-card:      #0f1520;
+  --bg-card2:     #131a25;
+  --border:       #1c2535;
+  --border-soft:  #151e2d;
   --text-primary: #e8edf5;
-  --text-muted: #8896aa;
-  --text-dim: #3d4f65;
-  --blue: #3b82f6;
+  --text-muted:   #8896aa;
+  --text-dim:     #3d4f65;
+  --blue:    #3b82f6;
   --emerald: #10b981;
-  --amber: #f59e0b;
-  --purple: #8b5cf6;
-  --pink: #ec4899;
-  --red: #f43f5e;
+  --amber:   #f59e0b;
+  --purple:  #8b5cf6;
+  --pink:    #ec4899;
+  --red:     #f43f5e;
+  /* Safe area insets for notch / Dynamic Island / home indicator */
+  --safe-top:    env(safe-area-inset-top,    0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 html {
   direction: rtl;
   color-scheme: dark;
+  -webkit-overflow-scrolling: touch;
 }
 
 body {
@@ -34,8 +38,40 @@ body {
   font-size: 16px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Remove 300ms tap delay on mobile */
+  touch-action: manipulation;
+  /* Prevent pull-to-refresh from conflicting with scroll */
+  overscroll-behavior-y: contain;
+  /* Remove blue flash on tap */
+  -webkit-tap-highlight-color: transparent;
 }
 
-.tabular {
-  font-variant-numeric: tabular-nums;
+/* Native tap feel */
+button, [role="button"], a {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
+
+/* Hide scrollbars (keep functionality) */
+::-webkit-scrollbar { display: none; }
+* { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Use dvh (dynamic viewport height) so browser chrome doesn't cut content */
+.min-h-screen { min-height: 100dvh; }
+
+.tabular { font-variant-numeric: tabular-nums; }
+
+/* Skeleton shimmer */
+@keyframes shimmer {
+  0%, 100% { opacity: 0.6; }
+  50%       { opacity: 0.25; }
+}
+.animate-pulse { animation: shimmer 1.6s ease-in-out infinite; }
+
+/* Page entrance fade+slide */
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.page-enter { animation: fadeSlideUp 0.2s ease-out forwards; }
