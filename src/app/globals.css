@@ -1,69 +1,44 @@
 ﻿@tailwind base;
 @tailwind components;
 @tailwind utilities;
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800&display=swap');
 
 :root {
-  /* Light theme tokens */
-  --bg-base:      #F2F5FA;
-  --bg-card:      #FFFFFF;
-  --bg-card2:     #F8FAFC;
-  --border:       #E2E8F0;
-  --border-soft:  #EEF2F7;
-  --text-primary: #0F1729;
-  --text-muted:   #64748B;
-  --text-dim:     #94A3B8;
-
-  /* Brand colors — same accents, light background */
-  --blue:    #1D4ED8;
-  --emerald: #059669;
-  --amber:   #D97706;
-  --purple:  #7C3AED;
-  --pink:    #DB2777;
-  --red:     #DC2626;
-
-  /* Safe areas */
-  --safe-top:    env(safe-area-inset-top,    0px);
-  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --background:         #F4F7FB;
+  --foreground:         #1A2233;
+  --card:               #FFFFFF;
+  --card-foreground:    #1A2233;
+  --primary:            #1D4ED8;
+  --primary-foreground: #FFFFFF;
+  --secondary:          #EFF4FF;
+  --secondary-foreground: #2D4B8E;
+  --muted:              #F1F5F9;
+  --muted-foreground:   #64748B;
+  --accent:             #EFF4FF;
+  --accent-foreground:  #1D4ED8;
+  --border:             #E2ECF8;
+  --success:            #059669;
+  --destructive:        #DC2626;
+  --safe-bottom:        env(safe-area-inset-bottom, 0px);
+  --radius:             14px;
 }
 
 html {
   direction: rtl;
   color-scheme: light;
+  font-family: 'Heebo', system-ui, sans-serif;
   -webkit-overflow-scrolling: touch;
 }
 
 body {
-  background: var(--bg-base);
-  color: var(--text-primary);
-  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
-  font-size: 16px;
-  line-height: 1.5;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: 'Heebo', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   touch-action: manipulation;
-  overscroll-behavior-y: contain;
   -webkit-tap-highlight-color: transparent;
-}
-
-button, [role="button"], a {
-  -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
 }
 
 ::-webkit-scrollbar { display: none; }
 * { -ms-overflow-style: none; scrollbar-width: none; }
-
-.min-h-screen { min-height: 100dvh; }
 .tabular { font-variant-numeric: tabular-nums; }
-
-/* Card shadow — light theme */
-.card-shadow {
-  box-shadow: 0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.05);
-}
-
-/* Skeleton */
-@keyframes shimmer {
-  0%, 100% { background-color: #E2E8F0; }
-  50%       { background-color: #F1F5F9; }
-}
-.animate-pulse { animation: shimmer 1.6s ease-in-out infinite; }
