@@ -1,77 +1,69 @@
 ﻿@tailwind base;
 @tailwind components;
 @tailwind utilities;
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
 :root {
-  --font-jakarta: 'Plus Jakarta Sans', sans-serif;
-  --font-inter:   'Inter', sans-serif;
-  --bg-base:      #080c14;
-  --bg-card:      #0f1520;
-  --bg-card2:     #131a25;
-  --border:       #1c2535;
-  --border-soft:  #151e2d;
-  --text-primary: #e8edf5;
-  --text-muted:   #8896aa;
-  --text-dim:     #3d4f65;
-  --blue:    #3b82f6;
-  --emerald: #10b981;
-  --amber:   #f59e0b;
-  --purple:  #8b5cf6;
-  --pink:    #ec4899;
-  --red:     #f43f5e;
-  /* Safe area insets for notch / Dynamic Island / home indicator */
+  /* Light theme tokens */
+  --bg-base:      #F2F5FA;
+  --bg-card:      #FFFFFF;
+  --bg-card2:     #F8FAFC;
+  --border:       #E2E8F0;
+  --border-soft:  #EEF2F7;
+  --text-primary: #0F1729;
+  --text-muted:   #64748B;
+  --text-dim:     #94A3B8;
+
+  /* Brand colors — same accents, light background */
+  --blue:    #1D4ED8;
+  --emerald: #059669;
+  --amber:   #D97706;
+  --purple:  #7C3AED;
+  --pink:    #DB2777;
+  --red:     #DC2626;
+
+  /* Safe areas */
   --safe-top:    env(safe-area-inset-top,    0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 html {
   direction: rtl;
-  color-scheme: dark;
+  color-scheme: light;
   -webkit-overflow-scrolling: touch;
 }
 
 body {
   background: var(--bg-base);
   color: var(--text-primary);
-  font-family: var(--font-jakarta);
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
   font-size: 16px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  /* Remove 300ms tap delay on mobile */
   touch-action: manipulation;
-  /* Prevent pull-to-refresh from conflicting with scroll */
   overscroll-behavior-y: contain;
-  /* Remove blue flash on tap */
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Native tap feel */
 button, [role="button"], a {
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
 }
 
-/* Hide scrollbars (keep functionality) */
 ::-webkit-scrollbar { display: none; }
 * { -ms-overflow-style: none; scrollbar-width: none; }
 
-/* Use dvh (dynamic viewport height) so browser chrome doesn't cut content */
 .min-h-screen { min-height: 100dvh; }
-
 .tabular { font-variant-numeric: tabular-nums; }
 
-/* Skeleton shimmer */
+/* Card shadow — light theme */
+.card-shadow {
+  box-shadow: 0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.05);
+}
+
+/* Skeleton */
 @keyframes shimmer {
-  0%, 100% { opacity: 0.6; }
-  50%       { opacity: 0.25; }
+  0%, 100% { background-color: #E2E8F0; }
+  50%       { background-color: #F1F5F9; }
 }
 .animate-pulse { animation: shimmer 1.6s ease-in-out infinite; }
-
-/* Page entrance fade+slide */
-@keyframes fadeSlideUp {
-  from { opacity: 0; transform: translateY(10px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-.page-enter { animation: fadeSlideUp 0.2s ease-out forwards; }
