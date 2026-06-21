@@ -77,9 +77,9 @@ export default async function TrainingPage() {
                       {new Date(String(w.workout_date)).toLocaleDateString('he-IL', { weekday: 'short', day: 'numeric', month: 'short' })}
                     </p>
                   </div>
-                  {w.duration_min && (
+                  {typeof w.duration_min === 'number' && (
                     <span className="rounded-full bg-brand-soft px-2.5 py-1 text-[11px] font-semibold text-primary">
-                      {String(w.duration_min)} דק׳
+                      {w.duration_min} דק׳
                     </span>
                   )}
                 </li>
