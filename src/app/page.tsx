@@ -1,148 +1,136 @@
 ﻿import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import {
-  Footprints, HeartPulse, Flame, Dumbbell,
-  Activity, UtensilsCrossed, Scale, MessageSquare,
-} from 'lucide-react'
-import BottomNav from '@/components/layout/BottomNav'
-import { DashboardHeader }  from '@/components/v0/dashboard-header'
-import { SummaryHero }      from '@/components/v0/summary-hero'
-import { StatsList }        from '@/components/v0/stats-list'
-import { WeeklyActivity }   from '@/components/v0/weekly-activity'
-import { QuickActions }     from '@/components/v0/quick-actions'
-import type { DailySummary, HealthMetric } from '@/lib/types'
+import { BottomNav }    from '@/components/v0-ui/bottom-nav'
+import { AppHeader }    from '@/components/v0-ui/app-header'
+import { QuickActions } from '@/components/v0-ui/dashboard/quick-actions'
+import { HeroCard }     from '@/components/v0-ui/dashboard/hero-card'
+import { StatsList }    from '@/components/v0-ui/dashboard/stats-list'
+import { WeeklyBarChart } from '@/components/v0-ui/weekly-bar-chart'
+import AiInsightCard from '@/components/dashboard/AiInsightCard'
+import type { DailySummary, HealthMetric, AiInsight } from '@/lib/types'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
 
-  const today = new Date().toISOString().slice(0, 10)
-  const weekStart = new Date()
-  weekStart.setDate(weekStart.getDate() - 6)
-  const weekStr = weekStart.toISOString().slice(0, 10)
+  const today    = new Date().toISOString().slice(0, 10)
+  const weekAgo  = new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10)
 
-  const [{ data: summary }, { data: metricsRaw }, { data: workoutsRaw }, { data: weekData }] = await Promise.all([
-    supabase.from('daily_summary').select('*').eq('user_id', user.id).eq('date', today).maybeSingle(),
-    supabase.from('health_metrics').select('*').eq('user_id', user.id)
-      .in('metric_type', ['hrv','hr_resting','stress','steps','vo2max'])
-      .gte('recorded_at', today).order('recorded_at', { ascending: false }),
-    supabase.from('workouts').select('workout_date,total_volume_kg').eq('user_id', user.id)
-      .gte('workout_date', weekStr).order('workout_date'),
-    supabase.from('daily_summary').select('date,active_kcal').eq('user_id', user.id)
-      .gte('date', weekStr).order('date'),
-  ])
+  const [{ data: summary }, { data: metricsRaw }, { data: insightRaw }, { data: workoutsRaw }, { data: weekRaw }] =
+    await Promise.all([
+      supabase.from('daily_summary').select('*').eq('user_id', user.id).eq('date', today).maybeSingle(),
+      supabase.from('health_metrics').select('*').eq('user_id', user.id)
+        .in('metric_type', ['hrv','hr_resting','stress','steps','vo2max'])
+        .gte('recorded_at', today).order('recorded_at', { ascending: false }),
+      supabase.from('ai_insights').select('*').eq('user_id', user.id).eq('insight_date', today).maybeSingle(),
+      supabase.from('workouts').select('workout_date').eq('user_id', user.id).gte('workout_date', weekAgo),
+      supabase.from('daily_summary').select('date,active_kcal').eq('user_id', user.id)
+        .gte('date', weekAgo).order('date'),
+    ])
 
-  const ds     = summary as DailySummary | null
+  const ds      = summary as DailySummary | null
   const metrics = (metricsRaw || []) as HealthMetric[]
-  const workouts = workoutsRaw || []
-  const week   = weekData || []
+  const ins     = insightRaw as AiInsight | null
+  const wkCount = (workoutsRaw || []).length
+  const weekData = weekRaw || []
 
   const getM = (t: string) => metrics.find(m => m.metric_type === t)?.value ?? null
-  const hrv   = getM('hrv')
-  const hr    = getM('hr_resting')
   const steps = getM('steps')
-  const vo2   = getM('vo2max')
+  const hr    = getM('hr_resting')
+  const hrv   = getM('hrv')
+
+  // Completion % based on steps + calories + workouts
+  const stepsPct    = steps    ? Math.min(steps / 10000 * 100, 100)                  : 0
+  const calPct      = ds       ? Math.min(ds.consumed_kcal / 2000 * 100, 100)        : 0
+  const workoutsPct = wkCount  ? Math.min(wkCount / 5 * 100, 100)                   : 0
+  const completion  = Math.round((stepsPct + calPct + workoutsPct) / 3)
+
+  // Weekly bar chart: active kcal as % of 600 target
+  const dayNames = ['א','ב','ג','ד','ה','ו','ש']
+  const weekBars = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(Date.now() - (6 - i) * 86400000)
+    const ds2 = weekData.find(w => w.date === d.toISOString().slice(0, 10))
+    return {
+      day: dayNames[d.getDay()],
+      value: ds2?.active_kcal ? Math.min(Math.round(ds2.active_kcal / 600 * 100), 100) : 0,
+    }
+  })
+
+  // Rings for hero (each 0–100)
+  const heroRings = [
+    { value: calPct,      color: '#ffffff' },
+    { value: workoutsPct, color: '#bfdbfe' },
+    { value: stepsPct,    color: '#7dd3fc' },
+  ]
+
+  // Stats data
+  const statsData = {
+    steps:    steps    ? steps.toLocaleString('he-IL')                                                : null,
+    hr:       hr       ? String(Math.round(hr))                                                       : null,
+    calories: ds       ? String(ds.active_kcal)                                                       : null,
+    protein:  ds       ? String(ds.protein_g)                                                         : null,
+    workouts: String(wkCount),
+    stepsPct, hrPct: hr ? Math.max(0, 100 - Math.abs(hr - 65) * 4) : 0,
+    calPct,   proteinPct: ds ? Math.min(ds.protein_g / 142 * 100, 100) : 0,
+    workoutsPct,
+  }
 
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'בוקר טוב' : hour < 17 ? 'צהריים טובים' : 'ערב טוב'
-  const userName = user.email?.split('@')[0] ?? 'יובל'
-
-  // Completion percentage based on available metrics
-  const targets = [
-    { val: steps ? steps / 10000 : 0 },
-    { val: ds ? Math.min(ds.consumed_kcal / 2000, 1) : 0 },
-    { val: workouts.length ? Math.min(workouts.length / 5, 1) : 0 },
-  ]
-  const completionPct = Math.round(targets.reduce((s, t) => s + t.val, 0) / targets.length * 100)
-
-  // Rings for hero
-  const rings = [
-    { label: 'קלוריות', value: ds?.consumed_kcal ?? 0, goal: 2000 },
-    { label: 'אימונים', value: workouts.length, goal: 5 },
-    { label: 'צעדים',  value: steps ? Math.round(steps / 1000) : 0, goal: 10 },
-  ]
-
-  // Stats list
-  const statItems = [
-    {
-      id: 'steps', label: 'צעדים', Icon: Footprints,
-      value: steps ? steps.toLocaleString('he-IL') : '--',
-      unit: 'צעדים', goal: 'יעד: 10,000',
-      progress: steps ? Math.min((steps / 10000) * 100, 100) : 0,
-    },
-    {
-      id: 'hr', label: 'דופק מנוחה', Icon: HeartPulse,
-      value: hr ? String(Math.round(hr)) : '--',
-      unit: 'פעימות/דקה', goal: 'טווח: 60–70',
-      progress: hr ? Math.max(0, 100 - Math.abs(hr - 65) * 3) : 0,
-    },
-    {
-      id: 'calories', label: 'קלוריות נאכלו', Icon: Flame,
-      value: ds ? ds.consumed_kcal.toLocaleString('he-IL') : '--',
-      unit: 'קל׳', goal: 'יעד: 2,000',
-      progress: ds ? Math.min((ds.consumed_kcal / 2000) * 100, 100) : 0,
-    },
-    {
-      id: 'protein', label: 'חלבון', Icon: Activity,
-      value: ds ? String(ds.protein_g) : '--',
-      unit: 'g', goal: `יעד: ${Math.round(79 * 1.8)}g`,
-      progress: ds ? Math.min((ds.protein_g / 142) * 100, 100) : 0,
-    },
-    {
-      id: 'workouts', label: 'אימונים השבוע', Icon: Dumbbell,
-      value: String(workouts.length),
-      unit: 'אימונים', goal: 'יעד: 5',
-      progress: Math.min((workouts.length / 5) * 100, 100),
-    },
-    ...(vo2 ? [{
-      id: 'vo2', label: 'VO₂ Max', Icon: Activity,
-      value: String(Math.round(vo2)),
-      unit: 'ml/kg/min', goal: 'כושר אירובי',
-      progress: Math.min((vo2 / 60) * 100, 100),
-    }] : []),
-  ]
-
-  // Weekly bar chart (steps % of goal or active kcal)
-  const dayNames = ['א׳','ב׳','ג׳','ד׳','ה׳','ו׳','ש׳']
-  const today7 = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(); d.setDate(d.getDate() - (6 - i))
-    const dateStr = d.toISOString().slice(0, 10)
-    const found = week.find(w => w.date === dateStr)
-    const active = found?.active_kcal ?? 0
-    const pct = Math.min(Math.round((active / 600) * 100), 100) || (i < 5 ? 0 : 0)
-    return { day: dayNames[d.getDay()], value: pct || 5 }
-  })
-
-  // Quick actions
-  const quickActions = [
-    { id: 'nutrition', label: 'הוסף ארוחה',  href: '/nutrition',    Icon: UtensilsCrossed },
-    { id: 'weight',    label: 'הוסף משקל',   href: '/body/weight',  Icon: Scale           },
-    { id: 'ai',        label: 'AI Coach',     href: '/ai',           Icon: MessageSquare   },
-    { id: 'training',  label: 'אימון כוח',   href: '/training',     Icon: Dumbbell        },
-  ]
+  const dateStr  = new Date().toLocaleDateString('he-IL', { weekday: 'short', day: 'numeric', month: 'short' })
 
   return (
-    <>
-      <main className="mx-auto min-h-screen w-full max-w-5xl px-4 pb-28 pt-6">
-        <DashboardHeader userName={userName} greeting={greeting} />
+    <div className="flex min-h-dvh flex-col bg-background">
+      <AppHeader title="לוח הבריאות שלי" subtitle={`${greeting} · ${dateStr}`} />
 
-        <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-5">
-          <div className="flex flex-col gap-5 lg:col-span-3">
-            <SummaryHero completionPct={completionPct} rings={rings} />
-            <WeeklyActivity data={today7} />
-          </div>
-          <div className="lg:col-span-2">
-            <StatsList stats={statItems} updatedText={hrv ? 'מסונכרן' : 'אין נתוני גארמין'} />
-          </div>
-        </div>
+      <main className="flex flex-col gap-4 px-4 py-4 pb-6 flex-1">
+        <QuickActions />
 
-        <div className="mt-5">
-          <QuickActions actions={quickActions} />
-        </div>
+        <HeroCard
+          completion={completion}
+          rings={heroRings}
+          miniStats={[
+            { label: 'קלוריות', value: ds ? `${ds.consumed_kcal}/2000` : '0/2000' },
+            { label: 'אימון',   value: `${wkCount}/5` },
+            { label: 'צעדים',   value: steps ? `${Math.round(steps/1000)}K/10K` : '0/10K' },
+          ]}
+        />
+
+        <StatsList
+          stats={{
+            steps:    statsData.steps,    stepsPct:    statsData.stepsPct,
+            hr:       statsData.hr,       hrPct:       statsData.hrPct,
+            calories: statsData.calories, calPct:      statsData.calPct,
+            protein:  statsData.protein,  proteinPct:  statsData.proteinPct,
+            workouts: statsData.workouts, workoutsPct: statsData.workoutsPct,
+          }}
+          hasGarmin={!!hrv}
+        />
+
+        {weekBars.some(b => b.value > 0) && (
+          <section className="rounded-3xl bg-card p-4 shadow-sm">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-sm font-bold text-foreground">פעילות שבועית</h2>
+              <span className="rounded-full bg-brand-soft px-2.5 py-1 text-[11px] font-semibold text-primary">
+                קלוריות
+              </span>
+            </div>
+            <WeeklyBarChart data={weekBars} />
+          </section>
+        )}
+
+        {ins && (
+          <div className="rounded-3xl bg-card p-4 shadow-sm" style={{ borderRight: '4px solid var(--pink)' }}>
+            <span className="inline-block mb-2 text-[9px] font-bold bg-pink text-white px-2 py-0.5 rounded-full uppercase" style={{ background: 'var(--pink)' }}>✦ AI Coach</span>
+            <p className="text-[13px] text-foreground/80 leading-relaxed"
+              dangerouslySetInnerHTML={{ __html: ins.content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} />
+          </div>
+        )}
       </main>
 
       <BottomNav />
-    </>
+    </div>
   )
 }
+

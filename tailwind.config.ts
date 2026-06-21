@@ -1,25 +1,81 @@
-import type { Config } from 'tailwindcss'
+﻿import type { Config } from 'tailwindcss'
+
 const config: Config = {
   darkMode: 'class',
   content: ['./src/**/*.{ts,tsx}'],
   theme: {
     extend: {
-      colors: {
-        'bg-base': '#080c14',
-        'bg-card': '#0f1520',
-        'bg-card2': '#131a25',
-        'brand-blue': '#3b82f6',
-        'brand-emerald': '#10b981',
-        'brand-amber': '#f59e0b',
-        'brand-purple': '#8b5cf6',
-        'brand-pink': '#ec4899',
-        'brand-red': '#f43f5e',
-      },
       fontFamily: {
-        sans: ['var(--font-jakarta)', 'var(--font-inter)', 'system-ui', 'sans-serif'],
+        sans: ['Heebo', 'var(--font-heebo)', 'system-ui', 'sans-serif'],
+      },
+      colors: {
+        background:  'var(--background)',
+        foreground:  'var(--foreground)',
+        card: {
+          DEFAULT:    'var(--card)',
+          foreground: 'var(--card-foreground)',
+        },
+        primary: {
+          DEFAULT:    'var(--primary)',
+          foreground: 'var(--primary-foreground)',
+        },
+        secondary: {
+          DEFAULT:    'var(--secondary)',
+          foreground: 'var(--secondary-foreground)',
+        },
+        muted: {
+          DEFAULT:    'var(--muted)',
+          foreground: 'var(--muted-foreground)',
+        },
+        accent: {
+          DEFAULT:    'var(--accent)',
+          foreground: 'var(--accent-foreground)',
+        },
+        destructive:  'var(--destructive)',
+        border:       'var(--border)',
+        input:        'var(--input)',
+        ring:         'var(--ring)',
+        brand: {
+          DEFAULT: 'var(--brand)',
+          soft:    'var(--brand-soft)',
+        },
+        amber: {
+          DEFAULT: 'var(--amber)',
+          soft:    'var(--amber-soft)',
+        },
+        purple: {
+          DEFAULT: 'var(--purple)',
+          soft:    'var(--purple-soft)',
+        },
+        green: {
+          DEFAULT: 'var(--green)',
+          soft:    'var(--green-soft)',
+        },
+        red: {
+          DEFAULT: 'var(--red)',
+          soft:    'var(--red-soft)',
+        },
+        pink: {
+          DEFAULT: 'var(--pink)',
+          soft:    'var(--pink-soft)',
+        },
+        teal: {
+          DEFAULT: 'var(--teal)',
+          soft:    'var(--teal-soft)',
+        },
+      },
+      borderRadius: {
+        sm:   'calc(var(--radius) * 0.6)',
+        md:   'calc(var(--radius) * 0.8)',
+        lg:   'var(--radius)',
+        xl:   'calc(var(--radius) * 1.4)',
+        '2xl': 'calc(var(--radius) * 1.8)',
+        '3xl': 'calc(var(--radius) * 2.2)',
+        '4xl': 'calc(var(--radius) * 2.6)',
       },
     },
   },
   plugins: [],
 }
+
 export default config
