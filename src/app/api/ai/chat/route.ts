@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+﻿import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 
@@ -14,13 +14,15 @@ export async function POST(request: Request) {
 
   const today = new Date().toISOString().slice(0, 10)
 
-  // Fetch context in parallel
+  // Fetch context — only load chat history if session_id is provided (null → new session, no history)
   const [summaryRes, insightRes, recentMsgsRes] = await Promise.all([
     supabase.from('daily_summary').select('*').eq('user_id', user.id).eq('date', today).maybeSingle(),
     supabase.from('ai_insights').select('content,insight_date').eq('user_id', user.id)
       .order('insight_date', { ascending: false }).limit(3),
-    supabase.from('chat_messages').select('role,content').eq('user_id', user.id)
-      .eq('session_id', session_id || '').order('created_at', { ascending: false }).limit(10),
+    session_id
+      ? supabase.from('chat_messages').select('role,content').eq('user_id', user.id)
+          .eq('session_id', session_id).order('created_at', { ascending: false }).limit(10)
+      : Promise.resolve({ data: [] }),
   ])
 
   const summary      = summaryRes.data
@@ -28,19 +30,19 @@ export async function POST(request: Request) {
   const recentMsgs   = (recentMsgsRes.data || []).reverse()
 
   // Build system prompt with user context
-  const systemPrompt = `אתה מאמן כושר ותזונה אישי חכם. אתה מדבר בעברית.
-אתה מכיר את הנתונים של המשתמש ומשתמש בהם בתשובות שלך.
+  const systemPrompt = `׳׳×׳” ׳׳׳׳ ׳›׳•׳©׳¨ ׳•׳×׳–׳•׳ ׳” ׳׳™׳©׳™ ׳—׳›׳. ׳׳×׳” ׳׳“׳‘׳¨ ׳‘׳¢׳‘׳¨׳™׳×.
+׳׳×׳” ׳׳›׳™׳¨ ׳׳× ׳”׳ ׳×׳•׳ ׳™׳ ׳©׳ ׳”׳׳©׳×׳׳© ׳•׳׳©׳×׳׳© ׳‘׳”׳ ׳‘׳×׳©׳•׳‘׳•׳× ׳©׳׳.
 
-${summary ? `נתוני היום (${today}):
-- BMR: ${summary.bmr_kcal} קל׳
-- פעילות: ${summary.active_kcal} קל׳
-- נאכל: ${summary.consumed_kcal} קל׳
-- מאזן: ${summary.net_balance > 0 ? '+' : ''}${summary.net_balance} קל׳ (${summary.net_balance <= 0 ? 'גרעון' : 'עודף'})
-- חלבון: ${summary.protein_g}g | פחמימות: ${summary.carbs_g}g | שומן: ${summary.fat_g}g` : 'אין נתוני תזונה להיום עדיין.'}
+${summary ? `׳ ׳×׳•׳ ׳™ ׳”׳™׳•׳ (${today}):
+- BMR: ${summary.bmr_kcal} ׳§׳׳³
+- ׳₪׳¢׳™׳׳•׳×: ${summary.active_kcal} ׳§׳׳³
+- ׳ ׳׳›׳: ${summary.consumed_kcal} ׳§׳׳³
+- ׳׳׳–׳: ${summary.net_balance > 0 ? '+' : ''}${summary.net_balance} ׳§׳׳³ (${summary.net_balance <= 0 ? '׳’׳¨׳¢׳•׳' : '׳¢׳•׳“׳£'})
+- ׳—׳׳‘׳•׳: ${summary.protein_g}g | ׳₪׳—׳׳™׳׳•׳×: ${summary.carbs_g}g | ׳©׳•׳׳: ${summary.fat_g}g` : '׳׳™׳ ׳ ׳×׳•׳ ׳™ ׳×׳–׳•׳ ׳” ׳׳”׳™׳•׳ ׳¢׳“׳™׳™׳.'}
 
-${insights.length ? `תובנות אחרונות:\n${insights.map(i => `• ${i.insight_date}: ${i.content.slice(0, 100)}...`).join('\n')}` : ''}
+${insights.length ? `׳×׳•׳‘׳ ׳•׳× ׳׳—׳¨׳•׳ ׳•׳×:\n${insights.map(i => `ג€¢ ${i.insight_date}: ${i.content.slice(0, 100)}...`).join('\n')}` : ''}
 
-ענה בתמציתיות. השתמש ב-**bold** לנתונים חשובים. אם שואלים על קלוריות, תן מספרים מדויקים.`
+׳¢׳ ׳” ׳‘׳×׳׳¦׳™׳×׳™׳•׳×. ׳”׳©׳×׳׳© ׳‘-**bold** ׳׳ ׳×׳•׳ ׳™׳ ׳—׳©׳•׳‘׳™׳. ׳׳ ׳©׳•׳׳׳™׳ ׳¢׳ ׳§׳׳•׳¨׳™׳•׳×, ׳×׳ ׳׳¡׳₪׳¨׳™׳ ׳׳“׳•׳™׳§׳™׳.`
 
   // Build messages array
   const messages: { role: 'user' | 'assistant'; content: string }[] = [
@@ -85,3 +87,4 @@ export async function GET() {
 
   return NextResponse.json((data || []).reverse())
 }
+

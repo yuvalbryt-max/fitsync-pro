@@ -1,6 +1,6 @@
 ﻿'use client'
 import { useState, useEffect, useCallback } from 'react'
-import BottomNav from '@/components/layout/BottomNav'
+import { BottomNav } from '@/components/v0-ui/bottom-nav'
 import { formatKg } from '@/lib/utils'
 
 interface BodyMetric { id: number; measured_at: string; weight_kg: number; source: string }
@@ -135,3 +135,4 @@ export default function WeightPage() {
     </div>
   )
 }
+

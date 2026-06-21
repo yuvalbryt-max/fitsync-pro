@@ -34,7 +34,7 @@ def main():
 
     hrv_vals   = [m["value"] for m in metrics if m["metric_type"] == "hrv"]
     hrv_avg    = round(sum(hrv_vals) / len(hrv_vals), 1) if hrv_vals else "אין נתון"
-    weekly_net = sum(r.get("net_balance", 0) for r in weekly)
+    weekly_net = int(sum(r.get("net_balance", 0) or 0 for r in weekly))  # cast to int for :+d format
 
     summary_line = (
         f"אתמול: BMR={summary['bmr_kcal']} קל׳, פעילות={summary['active_kcal']} קל׳, "
@@ -76,3 +76,4 @@ HRV ממוצע (7 ימים): {hrv_avg}ms
 
 if __name__ == "__main__":
     main()
+

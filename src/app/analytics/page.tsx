@@ -14,9 +14,10 @@ export default async function AnalyticsPage() {
   const monthAgo = new Date(Date.now() - 29 * 86400000).toISOString().slice(0, 10)
   const weekAgo  = new Date(Date.now() - 6  * 86400000).toISOString().slice(0, 10)
 
+  // Fix: table is body_metrics (not body_weights), column is measured_at (not recorded_at)
   const [{ data: weightsRaw }, { data: summariesRaw }, { data: metricsRaw }] = await Promise.all([
-    supabase.from('body_weights').select('weight_kg,recorded_at').eq('user_id', user.id)
-      .gte('recorded_at', monthAgo).order('recorded_at'),
+    supabase.from('body_metrics').select('weight_kg,measured_at').eq('user_id', user.id)
+      .gte('measured_at', monthAgo).order('measured_at'),
     supabase.from('daily_summary').select('date,consumed_kcal,active_kcal').eq('user_id', user.id)
       .gte('date', weekAgo).order('date'),
     supabase.from('health_metrics').select('value,recorded_at').eq('user_id', user.id)
@@ -40,15 +41,25 @@ export default async function AnalyticsPage() {
     return { day: dayNames[d.getDay()], value: (ds.consumed_kcal || 0) - (ds.active_kcal || 0) - 2000 }
   })
 
-  const weights = (weightsRaw || []).map(w => w.weight_kg)
+  const weights = (weightsRaw || []).map(w => Number(w.weight_kg))
+  // Fix: use measured_at (correct column) for date labels
   const weightLabels = weightsRaw && weightsRaw.length > 0
-    ? [new Date(weightsRaw[0].recorded_at).toLocaleDateString('he-IL', { day: 'numeric', month: 'short' }),
-       new Date(weightsRaw[weightsRaw.length - 1].recorded_at).toLocaleDateString('he-IL', { day: 'numeric', month: 'short' })]
+    ? [new Date(weightsRaw[0].measured_at).toLocaleDateString('he-IL', { day: 'numeric', month: 'short' }),
+       new Date(weightsRaw[weightsRaw.length - 1].measured_at).toLocaleDateString('he-IL', { day: 'numeric', month: 'short' })]
     : []
 
-  const hrvData = (metricsRaw || []).map(m => m.value)
+  const hrvData = (metricsRaw || []).map(m => Number(m.value))
   const latestWeight = weights.length > 0 ? weights[weights.length - 1] : null
   const weightChange = weights.length > 1 ? (weights[weights.length - 1] - weights[0]).toFixed(1) : null
+
+  // Fix: only average days that actually have data (not divide by 7 if only 3 days exist)
+  const summariesWithData = (summariesRaw || []).filter(d => d.consumed_kcal > 0 || d.active_kcal > 0)
+  const avgCalories = summariesWithData.length > 0
+    ? Math.round(summariesWithData.reduce((s, d) => s + (d.consumed_kcal || 0), 0) / summariesWithData.length)
+    : null
+  const avgActive = summariesWithData.length > 0
+    ? Math.round(summariesWithData.reduce((s, d) => s + (d.active_kcal || 0), 0) / summariesWithData.length)
+    : null
 
   return (
     <div className="flex min-h-dvh flex-col bg-background">
@@ -56,13 +67,13 @@ export default async function AnalyticsPage() {
 
       <main className="flex flex-col gap-4 px-4 py-4 pb-6 flex-1">
 
-        {/* Weight card */}
+        {/* Weight trend */}
         <section className="rounded-3xl bg-card p-4 shadow-sm">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-bold text-foreground">מגמת משקל</h2>
             <div className="flex items-center gap-2">
-              {latestWeight && (
-                <span className="text-sm font-bold text-foreground">{latestWeight} ק״ג</span>
+              {latestWeight !== null && (
+                <span className="text-sm font-bold text-foreground">{latestWeight.toFixed(1)} ק״ג</span>
               )}
               {weightChange !== null && (
                 <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
@@ -82,7 +93,7 @@ export default async function AnalyticsPage() {
           )}
         </section>
 
-        {/* HRV card */}
+        {/* HRV */}
         {hrvData.length > 1 && (
           <section className="rounded-3xl bg-card p-4 shadow-sm">
             <div className="mb-3 flex items-center justify-between">
@@ -95,7 +106,7 @@ export default async function AnalyticsPage() {
           </section>
         )}
 
-        {/* Weekly activity */}
+        {/* Weekly activity bars */}
         <section className="rounded-3xl bg-card p-4 shadow-sm">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-bold text-foreground">פעילות שבועית</h2>
@@ -111,24 +122,20 @@ export default async function AnalyticsPage() {
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-bold text-foreground">מאזן קלורי</h2>
             <div className="flex items-center gap-3 text-[11px] font-medium">
-              <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-green inline-block"/>גירעון</span>
-              <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-red inline-block"/>עודף</span>
+              <span className="flex items-center gap-1"><span className="inline-block h-2 w-2 rounded-full bg-green"/>גירעון</span>
+              <span className="flex items-center gap-1"><span className="inline-block h-2 w-2 rounded-full bg-red"/>עודף</span>
             </div>
           </div>
           <CalorieBalanceChart data={calBalance} />
         </section>
 
-        {/* Summary stats */}
+        {/* Weekly summary */}
         <section className="rounded-3xl bg-card p-4 shadow-sm">
           <h2 className="mb-3 text-sm font-bold text-foreground">סיכום שבועי</h2>
           <div className="grid grid-cols-2 gap-3">
             {[
-              { label: 'קלוריות ממוצע', value: summariesRaw && summariesRaw.length > 0
-                ? Math.round(summariesRaw.reduce((s, d) => s + (d.consumed_kcal || 0), 0) / summariesRaw.length).toLocaleString('he-IL')
-                : '—', unit: 'קל׳/יום', color: 'text-amber', bg: 'bg-amber-soft' },
-              { label: 'פעילות ממוצע', value: summariesRaw && summariesRaw.length > 0
-                ? Math.round(summariesRaw.reduce((s, d) => s + (d.active_kcal || 0), 0) / summariesRaw.length).toLocaleString('he-IL')
-                : '—', unit: 'קל׳/יום', color: 'text-green', bg: 'bg-green-soft' },
+              { label: 'קלוריות ממוצע', value: avgCalories ? avgCalories.toLocaleString('he-IL') : '—', unit: 'קל׳/יום', color: 'text-amber', bg: 'bg-amber-soft' },
+              { label: 'פעילות ממוצע',  value: avgActive   ? avgActive.toLocaleString('he-IL')   : '—', unit: 'קל׳/יום', color: 'text-green', bg: 'bg-green-soft' },
             ].map(s => (
               <div key={s.label} className={`rounded-2xl ${s.bg} p-3`}>
                 <p className="text-[11px] font-medium text-muted-foreground">{s.label}</p>

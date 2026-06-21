@@ -13,7 +13,7 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
 
-TOKENSTORE = Path("/tmp/garth_tokens")
+TOKENSTORE = Path(os.environ.get("GARMIN_TOKENSTORE", "/tmp/garth_tokens"))  # Set to persistent volume in Railway
 
 
 def get_garmin():
@@ -167,3 +167,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
