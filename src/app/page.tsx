@@ -143,7 +143,7 @@ export default async function DashboardPage() {
                 </div>
               </div>
             </div>
-          </Card>
+          </div>
         </div>
 
         {/* Stats grid */}
@@ -196,3 +196,4 @@ export default async function DashboardPage() {
     </div>
   )
 }
+
