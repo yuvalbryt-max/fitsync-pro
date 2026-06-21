@@ -1,415 +1,264 @@
-'use client'
+﻿'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import BottomNav from '@/components/layout/BottomNav'
+import { formatKcal } from '@/lib/utils'
 
 type NutritionEntry = {
-  id: string
-  food_name: string
-  kcal: number
-  grams: number | null
-  protein_g: number | null
-  carbs_g: number | null
-  fat_g: number | null
-  entry_method: string
-  logged_at: string
+  id: string; food_name: string; kcal: number; grams: number | null
+  protein_g: number | null; carbs_g: number | null; fat_g: number | null
+  entry_method: string; logged_at: string
 }
-
 type Tab = 'log' | 'text' | 'manual'
 
 export default function NutritionPage() {
   const [activeTab, setActiveTab] = useState<Tab>('log')
-  const [entries, setEntries] = useState<NutritionEntry[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
+  const [entries, setEntries]     = useState<NutritionEntry[]>([])
+  const [loading, setLoading]     = useState(false)
 
-  // Text entry state
-  const [textInput, setTextInput] = useState('')
-  const [textLoading, setTextLoading] = useState(false)
+  // Text + photo tab
+  const [textInput, setTextInput]   = useState('')
+  const [imageB64, setImageB64]     = useState<string | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [textResult, setTextResult] = useState<{ entries: NutritionEntry[]; total_kcal: number; model_used: string } | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
 
-  // Manual entry state
-  const [manualForm, setManualForm] = useState({
-    food_name: '',
-    kcal: '',
-    grams: '',
-    protein_g: '',
-    carbs_g: '',
-    fat_g: '',
-  })
-  const [manualLoading, setManualLoading] = useState(false)
+  // Manual tab
+  const [form, setForm] = useState({ food_name: '', kcal: '', protein_g: '', carbs_g: '', fat_g: '' })
 
-  // Photo entry state
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const [photoGrams, setPhotoGrams] = useState('100')
-  const [photoLoading, setPhotoLoading] = useState(false)
-
-  async function fetchEntries() {
-    setLoading(true)
-    setError(null)
-    try {
-      const res = await fetch('/api/nutrition/manual')
-      if (!res.ok) throw new Error('Failed to fetch entries')
-      const data = await res.json()
-      setEntries(data)
-    } catch (err) {
-      setError(String(err))
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    fetchEntries()
+  const fetchEntries = useCallback(async () => {
+    const res = await fetch('/api/nutrition/manual')
+    if (res.ok) setEntries(await res.json())
   }, [])
 
-  const totalKcal = entries.reduce((sum, e) => sum + (e.kcal || 0), 0)
-  const totalProtein = entries.reduce((sum, e) => sum + (e.protein_g || 0), 0)
-  const totalCarbs = entries.reduce((sum, e) => sum + (e.carbs_g || 0), 0)
-  const totalFat = entries.reduce((sum, e) => sum + (e.fat_g || 0), 0)
+  useEffect(() => { fetchEntries() }, [fetchEntries])
 
-  function showSuccess(msg: string) {
-    setSuccess(msg)
-    setTimeout(() => setSuccess(null), 3000)
-  }
+  const totals = entries.reduce((acc, e) => ({
+    kcal:      acc.kcal      + e.kcal,
+    protein_g: acc.protein_g + (e.protein_g || 0),
+    carbs_g:   acc.carbs_g   + (e.carbs_g   || 0),
+    fat_g:     acc.fat_g     + (e.fat_g      || 0),
+  }), { kcal: 0, protein_g: 0, carbs_g: 0, fat_g: 0 })
 
-  async function handleTextSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!textInput.trim()) return
-    setTextLoading(true)
-    setError(null)
-    try {
-      const res = await fetch('/api/nutrition/text', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: textInput }),
-      })
-      if (!res.ok) {
-        const d = await res.json()
-        throw new Error(d.error || 'Failed to parse text')
-      }
-      const data = await res.json()
-      setTextInput('')
-      showSuccess(`Added ${data.entries?.length || 0} item(s) — ${data.total_kcal} kcal`)
-      setActiveTab('log')
-      fetchEntries()
-    } catch (err) {
-      setError(String(err))
-    } finally {
-      setTextLoading(false)
-    }
-  }
-
-  async function handleManualSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!manualForm.food_name || !manualForm.kcal) return
-    setManualLoading(true)
-    setError(null)
-    try {
-      const res = await fetch('/api/nutrition/manual', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          food_name: manualForm.food_name,
-          kcal: manualForm.kcal,
-          grams: manualForm.grams || null,
-          protein_g: manualForm.protein_g || null,
-          carbs_g: manualForm.carbs_g || null,
-          fat_g: manualForm.fat_g || null,
-        }),
-      })
-      if (!res.ok) {
-        const d = await res.json()
-        throw new Error(d.error || 'Failed to add entry')
-      }
-      setManualForm({ food_name: '', kcal: '', grams: '', protein_g: '', carbs_g: '', fat_g: '' })
-      showSuccess('Entry added successfully')
-      setActiveTab('log')
-      fetchEntries()
-    } catch (err) {
-      setError(String(err))
-    } finally {
-      setManualLoading(false)
-    }
-  }
-
-  async function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    setPhotoLoading(true)
-    setError(null)
-    try {
-      const reader = new FileReader()
-      reader.onload = async (ev) => {
-        const base64 = (ev.target?.result as string).split(',')[1]
-        const res = await fetch('/api/nutrition/photo', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ imageBase64: base64, grams: photoGrams }),
-        })
-        if (!res.ok) {
-          const d = await res.json()
-          throw new Error(d.error || 'Failed to analyze photo')
-        }
-        const data = await res.json()
-        showSuccess(`Added ${data.entry?.food_name} — ${data.entry?.kcal} kcal`)
-        setActiveTab('log')
-        fetchEntries()
-        setPhotoLoading(false)
-      }
-      reader.readAsDataURL(file)
-    } catch (err) {
-      setError(String(err))
-      setPhotoLoading(false)
+    const reader = new FileReader()
+    reader.onload = ev => {
+      const dataUrl = ev.target?.result as string
+      setImagePreview(dataUrl)
+      // Strip the data URL prefix to get pure base64
+      setImageB64(dataUrl.split(',')[1])
     }
-    // Reset file input
-    if (fileInputRef.current) fileInputRef.current.value = ''
+    reader.readAsDataURL(file)
   }
 
+  function clearImage() {
+    setImageB64(null); setImagePreview(null)
+    if (fileRef.current) fileRef.current.value = ''
+  }
+
+  async function submitText(e: React.FormEvent) {
+    e.preventDefault()
+    setLoading(true); setTextResult(null)
+    const res = await fetch('/api/nutrition/text', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: textInput, imageBase64: imageB64 }),
+    })
+    if (res.ok) {
+      const data = await res.json()
+      setTextResult(data); await fetchEntries()
+      setTextInput(''); clearImage()
+    }
+    setLoading(false)
+  }
+
+  async function submitManual(e: React.FormEvent) {
+    e.preventDefault(); setLoading(true)
+    const res = await fetch('/api/nutrition/manual', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ food_name: form.food_name, kcal: form.kcal, protein_g: form.protein_g || undefined, carbs_g: form.carbs_g || undefined, fat_g: form.fat_g || undefined }),
+    })
+    if (res.ok) { setForm({ food_name: '', kcal: '', protein_g: '', carbs_g: '', fat_g: '' }); await fetchEntries(); setActiveTab('log') }
+    setLoading(false)
+  }
+
+  const inputCls = "w-full bg-[#080c14] border border-[#1c2535] rounded-xl px-4 py-3 text-[#e8edf5] placeholder:text-[#3d4f65] focus:outline-none focus:border-[#3b82f6] text-base"
+  const labelCls = "block text-sm font-medium text-[#8896aa] mb-1.5"
+
   return (
-    <div className="min-h-screen bg-gray-950 text-white p-4 max-w-2xl mx-auto">
-      <h1 className="text-2xl font-bold mb-2">Nutrition Tracker</h1>
-      <p className="text-gray-400 text-sm mb-6">
-        {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-      </p>
+    <div className="flex flex-col min-h-screen">
+      {/* Header + Tabs */}
+      <div className="sticky top-0 z-50 bg-[#080c14] px-5 pt-5 pb-3">
+        <h1 className="text-xl font-bold mb-3">תזונה</h1>
+        <div className="flex gap-1 bg-[#0f1520] rounded-xl p-1">
+          {([['log','יומן'],['text','מלל + תמונה'],['manual','ידני']] as [Tab,string][]).map(([t,l]) => (
+            <button key={t} onClick={() => setActiveTab(t)}
+              className={`flex-1 py-2 rounded-lg text-[11px] font-semibold transition-colors ${activeTab===t ? 'bg-[#1c2535] text-[#e8edf5]' : 'text-[#8896aa]'}`}>
+              {l}
+            </button>
+          ))}
+        </div>
+      </div>
 
-      {/* Daily summary */}
-      <div className="grid grid-cols-4 gap-3 mb-6">
-        {[
-          { label: 'Calories', value: Math.round(totalKcal), unit: 'kcal', color: 'text-orange-400' },
-          { label: 'Protein', value: totalProtein.toFixed(1), unit: 'g', color: 'text-blue-400' },
-          { label: 'Carbs', value: totalCarbs.toFixed(1), unit: 'g', color: 'text-yellow-400' },
-          { label: 'Fat', value: totalFat.toFixed(1), unit: 'g', color: 'text-red-400' },
-        ].map((stat) => (
-          <div key={stat.label} className="bg-gray-900 rounded-xl p-3 text-center">
-            <div className={`text-xl font-bold ${stat.color}`}>{stat.value}</div>
-            <div className="text-xs text-gray-500">{stat.unit}</div>
-            <div className="text-xs text-gray-400 mt-1">{stat.label}</div>
+      <div className="flex-1 px-4 pb-4 space-y-3">
+        {/* Daily totals — always visible */}
+        <div className="bg-[#0f1520] border border-[#1c2535] border-t-2 border-t-[#10b981] rounded-2xl p-4">
+          <p className="text-[10px] text-[#8896aa] font-semibold uppercase tracking-wide mb-2">סה״כ היום</p>
+          <div className="flex items-baseline gap-2 mb-3">
+            <span className="text-[28px] font-extrabold tabular text-[#10b981]">{formatKcal(totals.kcal)}</span>
+            <span className="text-xs text-[#8896aa]">קל׳</span>
           </div>
-        ))}
-      </div>
-
-      {/* Tabs */}
-      <div className="flex gap-1 mb-6 bg-gray-900 rounded-xl p-1">
-        {([
-          { key: 'log', label: 'Today\'s Log' },
-          { key: 'text', label: 'Text / Photo' },
-          { key: 'manual', label: 'Manual' },
-        ] as { key: Tab; label: string }[]).map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === tab.key
-                ? 'bg-orange-500 text-white'
-                : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Messages */}
-      {error && (
-        <div className="bg-red-900/50 border border-red-700 text-red-300 rounded-lg p-3 mb-4 text-sm">
-          {error}
+          <div className="flex gap-2">
+            {[{l:'חלבון',v:Math.round(totals.protein_g),c:'text-[#3b82f6]'},{l:'פחמימות',v:Math.round(totals.carbs_g),c:'text-[#f59e0b]'},{l:'שומן',v:Math.round(totals.fat_g),c:'text-[#8b5cf6]'}].map(({l,v,c}) => (
+              <div key={l} className="flex-1 text-center bg-[#131a25] rounded-xl py-2">
+                <p className={`text-sm font-bold tabular ${c}`}>{v}g</p>
+                <p className="text-[9px] text-[#8896aa] mt-0.5">{l}</p>
+              </div>
+            ))}
+          </div>
         </div>
-      )}
-      {success && (
-        <div className="bg-green-900/50 border border-green-700 text-green-300 rounded-lg p-3 mb-4 text-sm">
-          {success}
-        </div>
-      )}
 
-      {/* Log Tab */}
-      {activeTab === 'log' && (
-        <div>
-          {loading ? (
-            <div className="text-center text-gray-500 py-8">Loading entries...</div>
-          ) : entries.length === 0 ? (
-            <div className="text-center text-gray-500 py-8">
-              <p className="text-lg mb-2">No entries yet today</p>
-              <p className="text-sm">Use Text/Photo or Manual tab to add food</p>
+        {/* LOG TAB */}
+        {activeTab === 'log' && (
+          entries.length === 0 ? (
+            <div className="text-center py-12 text-[#8896aa]">
+              <p className="text-4xl mb-3">🥗</p>
+              <p className="font-semibold">אין רשומות להיום</p>
+              <p className="text-sm mt-1">הוסף ארוחה באמצעות הטאבים למעלה</p>
             </div>
           ) : (
             <div className="space-y-2">
-              {entries.map((entry) => (
-                <div key={entry.id} className="bg-gray-900 rounded-xl p-4">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="font-medium">{entry.food_name}</p>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        {entry.grams ? `${entry.grams}g · ` : ''}
-                        {entry.entry_method} ·{' '}
-                        {new Date(entry.logged_at).toLocaleTimeString('en-US', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold text-orange-400">{entry.kcal} kcal</p>
-                      {(entry.protein_g || entry.carbs_g || entry.fat_g) && (
-                        <p className="text-xs text-gray-500 mt-0.5">
-                          P:{entry.protein_g?.toFixed(0) ?? 0}g C:{entry.carbs_g?.toFixed(0) ?? 0}g F:{entry.fat_g?.toFixed(0) ?? 0}g
-                        </p>
-                      )}
-                    </div>
+              {entries.map(entry => (
+                <div key={entry.id} className="bg-[#0f1520] border border-[#1c2535] rounded-xl p-3.5 flex items-center justify-between">
+                  <div>
+                    <p className="font-semibold text-[14px]">{entry.food_name}</p>
+                    <p className="text-[11px] text-[#8896aa] mt-0.5">
+                      {new Date(entry.logged_at).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}
+                      {' · '}{entry.entry_method === 'text' ? 'מלל' : entry.entry_method === 'photo' ? 'מלל+תמונה' : 'ידני'}
+                    </p>
+                  </div>
+                  <div className="text-left">
+                    <p className="text-[15px] font-bold tabular">{formatKcal(entry.kcal)}</p>
+                    <p className="text-[10px] text-[#8896aa]">קל׳</p>
                   </div>
                 </div>
               ))}
             </div>
-          )}
-        </div>
-      )}
+          )
+        )}
 
-      {/* Text / Photo Tab */}
-      {activeTab === 'text' && (
-        <div className="space-y-6">
-          {/* Text entry */}
-          <div className="bg-gray-900 rounded-xl p-4">
-            <h2 className="font-semibold mb-3">Describe Your Meal</h2>
-            <form onSubmit={handleTextSubmit} className="space-y-3">
-              <textarea
-                value={textInput}
-                onChange={(e) => setTextInput(e.target.value)}
-                placeholder="e.g. 2 eggs, 1 toast with butter and a cup of coffee with milk"
-                className="w-full bg-gray-800 rounded-lg p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-orange-500"
-                rows={4}
-              />
-              <button
-                type="submit"
-                disabled={textLoading || !textInput.trim()}
-                className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-white py-2.5 rounded-lg font-medium transition-colors"
-              >
-                {textLoading ? 'Analyzing with AI...' : 'Parse with AI'}
-              </button>
-            </form>
-          </div>
-
-          {/* Photo entry */}
-          <div className="bg-gray-900 rounded-xl p-4">
-            <h2 className="font-semibold mb-3">Scan Nutrition Label</h2>
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <label className="text-sm text-gray-400 whitespace-nowrap">Serving (g):</label>
-                <input
-                  type="number"
-                  value={photoGrams}
-                  onChange={(e) => setPhotoGrams(e.target.value)}
-                  className="w-24 bg-gray-800 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  min="1"
-                />
-              </div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                className="hidden"
-                onChange={handlePhotoUpload}
-              />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={photoLoading}
-                className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white py-2.5 rounded-lg font-medium transition-colors"
-              >
-                {photoLoading ? 'Analyzing photo...' : 'Take Photo / Upload'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Manual Tab */}
-      {activeTab === 'manual' && (
-        <div className="bg-gray-900 rounded-xl p-4">
-          <h2 className="font-semibold mb-4">Add Entry Manually</h2>
-          <form onSubmit={handleManualSubmit} className="space-y-3">
+        {/* TEXT + PHOTO TAB */}
+        {activeTab === 'text' && (
+          <form onSubmit={submitText} className="space-y-3">
             <div>
-              <label className="text-xs text-gray-400 mb-1 block">Food Name *</label>
-              <input
-                type="text"
-                value={manualForm.food_name}
-                onChange={(e) => setManualForm((f) => ({ ...f, food_name: e.target.value }))}
-                placeholder="e.g. Chicken Breast"
-                className="w-full bg-gray-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
-                required
-              />
+              <label className={labelCls}>תאר מה אכלת</label>
+              <textarea value={textInput} onChange={e => setTextInput(e.target.value)}
+                placeholder="לדוגמא: אכלתי מוצרלה 100 גרם" rows={3} required
+                className={`${inputCls} resize-none`} />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs text-gray-400 mb-1 block">Calories (kcal) *</label>
-                <input
-                  type="number"
-                  value={manualForm.kcal}
-                  onChange={(e) => setManualForm((f) => ({ ...f, kcal: e.target.value }))}
-                  placeholder="250"
-                  className="w-full bg-gray-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  required
-                  min="0"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-gray-400 mb-1 block">Weight (g)</label>
-                <input
-                  type="number"
-                  value={manualForm.grams}
-                  onChange={(e) => setManualForm((f) => ({ ...f, grams: e.target.value }))}
-                  placeholder="150"
-                  className="w-full bg-gray-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  min="0"
-                />
-              </div>
+
+            {/* Image upload area */}
+            <div>
+              <label className={labelCls}>תמונת תווית תזונה (אופציונלי)</label>
+              {imagePreview ? (
+                <div className="relative">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={imagePreview} alt="תווית" className="w-full max-h-48 object-contain rounded-xl border border-[#1c2535] bg-[#0f1520]" />
+                  <button type="button" onClick={clearImage}
+                    className="absolute top-2 left-2 w-7 h-7 rounded-full bg-[#f43f5e] flex items-center justify-center text-white text-xs font-bold">
+                    ✕
+                  </button>
+                  <div className="absolute bottom-2 right-2 bg-[#10b981] text-black text-[10px] font-bold px-2 py-0.5 rounded-full">
+                    Gemini ינתח ✓
+                  </div>
+                </div>
+              ) : (
+                <button type="button" onClick={() => fileRef.current?.click()}
+                  className="w-full border-2 border-dashed border-[#1c2535] rounded-xl py-8 flex flex-col items-center gap-2 text-[#8896aa] hover:border-[#3b82f6] hover:text-[#3b82f6] transition-colors">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                    <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+                    <circle cx="12" cy="13" r="4"/>
+                  </svg>
+                  <span className="text-[12px] font-semibold">צלם או העלה תווית</span>
+                  <span className="text-[10px]">Gemini ינתח את הערכים התזונתיים</span>
+                </button>
+              )}
+              <input ref={fileRef} type="file" accept="image/*" capture="environment"
+                onChange={handleImageSelect} className="hidden" />
             </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <label className="text-xs text-gray-400 mb-1 block">Protein (g)</label>
-                <input
-                  type="number"
-                  value={manualForm.protein_g}
-                  onChange={(e) => setManualForm((f) => ({ ...f, protein_g: e.target.value }))}
-                  placeholder="30"
-                  className="w-full bg-gray-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  min="0"
-                  step="0.1"
-                />
+
+            {imageB64 && (
+              <div className="bg-[#2d1a52] border border-[#5b3aac] rounded-xl px-3 py-2 flex items-center gap-2">
+                <span className="text-[#8b5cf6] text-[10px] font-bold uppercase">✦ Gemini Vision</span>
+                <span className="text-[#c8d4e4] text-[11px]">ינתח מלל + תמונה יחד</span>
               </div>
-              <div>
-                <label className="text-xs text-gray-400 mb-1 block">Carbs (g)</label>
-                <input
-                  type="number"
-                  value={manualForm.carbs_g}
-                  onChange={(e) => setManualForm((f) => ({ ...f, carbs_g: e.target.value }))}
-                  placeholder="0"
-                  className="w-full bg-gray-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  min="0"
-                  step="0.1"
-                />
+            )}
+
+            {!imageB64 && (
+              <div className="bg-[#1d3461] border border-[#2555a0] rounded-xl px-3 py-2 flex items-center gap-2">
+                <span className="text-[#3b82f6] text-[10px] font-bold uppercase">GPT-4o</span>
+                <span className="text-[#c8d4e4] text-[11px]">ינתח את הטקסט</span>
               </div>
-              <div>
-                <label className="text-xs text-gray-400 mb-1 block">Fat (g)</label>
-                <input
-                  type="number"
-                  value={manualForm.fat_g}
-                  onChange={(e) => setManualForm((f) => ({ ...f, fat_g: e.target.value }))}
-                  placeholder="8"
-                  className="w-full bg-gray-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  min="0"
-                  step="0.1"
-                />
+            )}
+
+            <button type="submit" disabled={loading || !textInput}
+              className="w-full bg-[#3b82f6] hover:bg-[#2563eb] disabled:opacity-50 text-white font-semibold py-3 rounded-xl transition-colors">
+              {loading ? 'מנתח...' : imageB64 ? 'נתח מלל + תמונה' : 'נתח טקסט'}
+            </button>
+
+            {textResult && (
+              <div className="bg-[#0d3326] border border-[#0a5e40] rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <p className="text-[#10b981] font-bold">נוסף ליומן ✓</p>
+                  <span className="text-[9px] bg-[#0a5e40] text-[#10b981] px-2 py-0.5 rounded-full font-bold uppercase">{textResult.model_used}</span>
+                </div>
+                {textResult.entries.map((e: NutritionEntry, i: number) => (
+                  <div key={i} className="flex justify-between text-sm py-1">
+                    <span>{e.food_name}{e.grams ? ` (${e.grams}g)` : ''}</span>
+                    <span className="font-bold tabular">{formatKcal(e.kcal)} קל׳</span>
+                  </div>
+                ))}
+                <div className="border-t border-[#0a5e40] mt-2 pt-2 flex justify-between font-bold">
+                  <span>סה״כ</span><span>{formatKcal(textResult.total_kcal)} קל׳</span>
+                </div>
               </div>
+            )}
+          </form>
+        )}
+
+        {/* MANUAL TAB */}
+        {activeTab === 'manual' && (
+          <form onSubmit={submitManual} className="space-y-3">
+            <div>
+              <label className={labelCls}>שם המוצר *</label>
+              <input value={form.food_name} onChange={e => setForm(p=>({...p,food_name:e.target.value}))}
+                placeholder="קוטג׳ 5%" required className={inputCls} />
             </div>
-            <button
-              type="submit"
-              disabled={manualLoading || !manualForm.food_name || !manualForm.kcal}
-              className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-white py-2.5 rounded-lg font-medium transition-colors mt-2"
-            >
-              {manualLoading ? 'Adding...' : 'Add Entry'}
+            <div>
+              <label className={labelCls}>קלוריות *</label>
+              <input type="number" value={form.kcal} onChange={e => setForm(p=>({...p,kcal:e.target.value}))}
+                placeholder="350" required min="0" className={inputCls} />
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {[['protein_g','חלבון (g)'],['carbs_g','פחמימות (g)'],['fat_g','שומן (g)']].map(([k,l]) => (
+                <div key={k}>
+                  <label className={labelCls}>{l}</label>
+                  <input type="number" value={form[k as keyof typeof form]}
+                    onChange={e => setForm(p=>({...p,[k]:e.target.value}))}
+                    placeholder="0" min="0" step="0.1" className={inputCls} />
+                </div>
+              ))}
+            </div>
+            <button type="submit" disabled={loading||!form.food_name||!form.kcal}
+              className="w-full bg-[#3b82f6] hover:bg-[#2563eb] disabled:opacity-50 text-white font-semibold py-3 rounded-xl transition-colors">
+              {loading ? 'שומר...' : 'הוסף לרשומות'}
             </button>
           </form>
-        </div>
-      )}
+        )}
+      </div>
+      <BottomNav />
     </div>
   )
 }
