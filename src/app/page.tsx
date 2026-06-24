@@ -124,7 +124,7 @@ export default async function DashboardPage() {
           <div className="rounded-3xl bg-card p-4 shadow-sm" style={{ borderRight: '4px solid var(--pink)' }}>
             <span className="inline-block mb-2 text-[9px] font-bold bg-pink text-white px-2 py-0.5 rounded-full uppercase" style={{ background: 'var(--pink)' }}>✦ AI Coach</span>
             <p className="text-[13px] text-foreground/80 leading-relaxed"
-              dangerouslySetInnerHTML={{ __html: ins.content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} />
+              dangerouslySetInnerHTML={{ __html: ins.content.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} />
           </div>
         )}
       </main>
@@ -133,5 +133,4 @@ export default async function DashboardPage() {
     </div>
   )
 }
-
 

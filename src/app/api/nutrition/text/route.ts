@@ -120,7 +120,8 @@ export async function POST(request: Request) {
   if (text.length > MAX_TEXT_LENGTH) {
     return NextResponse.json({ error: `text too long (max ${MAX_TEXT_LENGTH} chars)` }, { status: 400 })
   }
-  if (imageBase64 !== undefined) {
+  // null means no image uploaded — only validate when an actual string is sent
+  if (imageBase64 != null) {
     if (typeof imageBase64 !== 'string' || imageBase64.length > MAX_IMAGE_B64_SIZE) {
       return NextResponse.json({ error: 'image too large (max ~3.75 MB)' }, { status: 400 })
     }

@@ -1,4 +1,4 @@
-﻿import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 
@@ -12,17 +12,15 @@ export async function POST(request: Request) {
   let body: { message?: unknown; session_id?: unknown }
   try { body = await request.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
   const { message, session_id } = body
-  if (!message || typeof message !== 'string' || !message.trim()) {
+  if (!message || typeof message !== 'string' || !message.trim())
     return NextResponse.json({ error: 'message is required' }, { status: 400 })
-  }
-  if (message.length > 2000) {
+  if (message.length > 2000)
     return NextResponse.json({ error: 'Message too long (max 2000 chars)' }, { status: 400 })
-  }
   const sessionIdStr = typeof session_id === 'string' ? session_id : null
 
   const today = new Date().toISOString().slice(0, 10)
 
-  // Fetch context — only load chat history if session_id is provided (null → new session, no history)
+  // Fetch context — only load history when session exists (null = new session)
   const [summaryRes, insightRes, recentMsgsRes] = await Promise.all([
     supabase.from('daily_summary').select('*').eq('user_id', user.id).eq('date', today).maybeSingle(),
     supabase.from('ai_insights').select('content,insight_date').eq('user_id', user.id)
@@ -38,19 +36,19 @@ export async function POST(request: Request) {
   const recentMsgs   = (recentMsgsRes.data || []).reverse()
 
   // Build system prompt with user context
-  const systemPrompt = `׳׳×׳” ׳׳׳׳ ׳›׳•׳©׳¨ ׳•׳×׳–׳•׳ ׳” ׳׳™׳©׳™ ׳—׳›׳. ׳׳×׳” ׳׳“׳‘׳¨ ׳‘׳¢׳‘׳¨׳™׳×.
-׳׳×׳” ׳׳›׳™׳¨ ׳׳× ׳”׳ ׳×׳•׳ ׳™׳ ׳©׳ ׳”׳׳©׳×׳׳© ׳•׳׳©׳×׳׳© ׳‘׳”׳ ׳‘׳×׳©׳•׳‘׳•׳× ׳©׳׳.
+  const systemPrompt = `אתה מאמן כושר ותזונה אישי חכם. אתה מדבר בעברית.
+אתה מכיר את הנתונים של המשתמש ומשתמש בהם בתשובות שלך.
 
-${summary ? `׳ ׳×׳•׳ ׳™ ׳”׳™׳•׳ (${today}):
-- BMR: ${summary.bmr_kcal} ׳§׳׳³
-- ׳₪׳¢׳™׳׳•׳×: ${summary.active_kcal} ׳§׳׳³
-- ׳ ׳׳›׳: ${summary.consumed_kcal} ׳§׳׳³
-- ׳׳׳–׳: ${summary.net_balance > 0 ? '+' : ''}${summary.net_balance} ׳§׳׳³ (${summary.net_balance <= 0 ? '׳’׳¨׳¢׳•׳' : '׳¢׳•׳“׳£'})
-- ׳—׳׳‘׳•׳: ${summary.protein_g}g | ׳₪׳—׳׳™׳׳•׳×: ${summary.carbs_g}g | ׳©׳•׳׳: ${summary.fat_g}g` : '׳׳™׳ ׳ ׳×׳•׳ ׳™ ׳×׳–׳•׳ ׳” ׳׳”׳™׳•׳ ׳¢׳“׳™׳™׳.'}
+${summary ? `נתוני היום (${today}):
+- BMR: ${summary.bmr_kcal} קל׳
+- פעילות: ${summary.active_kcal} קל׳
+- נאכל: ${summary.consumed_kcal} קל׳
+- מאזן: ${summary.net_balance > 0 ? '+' : ''}${summary.net_balance} קל׳ (${summary.net_balance <= 0 ? 'גרעון' : 'עודף'})
+- חלבון: ${summary.protein_g}g | פחמימות: ${summary.carbs_g}g | שומן: ${summary.fat_g}g` : 'אין נתוני תזונה להיום עדיין.'}
 
-${insights.length ? `׳×׳•׳‘׳ ׳•׳× ׳׳—׳¨׳•׳ ׳•׳×:\n${insights.map(i => `ג€¢ ${i.insight_date}: ${i.content.slice(0, 100)}...`).join('\n')}` : ''}
+${insights.length ? `תובנות אחרונות:\n${insights.map(i => `• ${i.insight_date}: ${i.content.slice(0, 100)}...`).join('\n')}` : ''}
 
-׳¢׳ ׳” ׳‘׳×׳׳¦׳™׳×׳™׳•׳×. ׳”׳©׳×׳׳© ׳‘-**bold** ׳׳ ׳×׳•׳ ׳™׳ ׳—׳©׳•׳‘׳™׳. ׳׳ ׳©׳•׳׳׳™׳ ׳¢׳ ׳§׳׳•׳¨׳™׳•׳×, ׳×׳ ׳׳¡׳₪׳¨׳™׳ ׳׳“׳•׳™׳§׳™׳.`
+ענה בתמציתיות. השתמש ב-**bold** לנתונים חשובים. אם שואלים על קלוריות, תן מספרים מדויקים.`
 
   // Build messages array
   const messages: { role: 'user' | 'assistant'; content: string }[] = [
@@ -71,9 +69,8 @@ ${insights.length ? `׳×׳•׳‘׳ ׳•׳× ׳׳—׳¨׳•׳ ׳•׳×
     if (!assistantContent) throw new Error('Empty response from AI')
     const sid = sessionIdStr || crypto.randomUUID()
 
-    // Save both messages
     await supabase.from('chat_messages').insert([
-      { user_id: user.id, session_id: sid, role: 'user',      content: message,          model_used: null },
+      { user_id: user.id, session_id: sid, role: 'user',      content: message.trim(),   model_used: null },
       { user_id: user.id, session_id: sid, role: 'assistant', content: assistantContent, model_used: 'claude-sonnet-4-6' },
     ])
 
@@ -98,6 +95,3 @@ export async function GET() {
 
   return NextResponse.json((data || []).reverse())
 }
-
-
-

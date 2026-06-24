@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { BottomNav } from '@/components/v0-ui/bottom-nav'
 import { formatKg } from '@/lib/utils'
@@ -20,20 +20,16 @@ export default function WeightPage() {
   const [weight, setWeight]   = useState('')
   const [loading, setLoading] = useState(false)
   const [saved, setSaved]     = useState(false)
-  const [error, setError]     = useState<string | null>(null)
 
   const load = useCallback(async () => {
-    try {
-      const res = await fetch('/api/body/weight')
-      if (res.ok) { setMetrics(await res.json()); setError(null) }
-      else setError('שגיאה בטעינת הנתונים')
-    } catch { setError('בעיית חיבור — נסה לרענן') }
+    const res = await fetch('/api/body/weight')
+    if (res.ok) setMetrics(await res.json())
   }, [])
 
   useEffect(() => { load() }, [load])
 
   async function submitWeight(e: React.FormEvent) {
-    e.preventDefault(); setError(null)
+    e.preventDefault()
     setLoading(true)
     const res = await fetch('/api/body/weight', {
       method: 'POST',
@@ -43,9 +39,6 @@ export default function WeightPage() {
     if (res.ok) {
       setSaved(true); setWeight(''); await load()
       setTimeout(() => setSaved(false), 3000)
-    } else {
-      const d = await res.json().catch(() => ({}))
-      setError(d?.error || 'שגיאה בשמירת המשקל')
     }
     setLoading(false)
   }
@@ -142,5 +135,3 @@ export default function WeightPage() {
     </div>
   )
 }
-
-
