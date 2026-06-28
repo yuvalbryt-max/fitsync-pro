@@ -1,6 +1,10 @@
 ﻿"""
 Jefit sync — strength workouts + personal records.
 Cron: 07:10, 14:10, 21:10 Israel (04:10, 11:10, 18:10 UTC).
+
+NOTE: Jefit closed their third-party API access (api.jefit.com returns 403).
+Alternative: Export workouts from Jefit app as CSV, then import via a
+future /api/import/jefit endpoint. This worker will log "skipped" gracefully.
 """
 import os, sys, logging
 from datetime import datetime, timezone, timedelta

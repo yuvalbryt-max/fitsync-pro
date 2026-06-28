@@ -17,40 +17,29 @@ TOKENSTORE = Path(os.environ.get("GARMIN_TOKENSTORE", "/tmp/garth_tokens"))  # S
 
 
 def get_garmin():
-    """Login to Garmin, reusing cached session when available to avoid rate limits."""
+    """Login to Garmin Connect.
+
+    garminconnect>=0.3: uses built-in retry_attempts + retry_min/max_wait.
+    Rate-limited IPs (429) may fail — Railway cloud IP should not be limited.
+    """
     email    = os.environ["GARMIN_EMAIL"]
     password = os.environ["GARMIN_PASSWORD"]
-
-    # Always ensure the tokenstore directory exists
-    TOKENSTORE.mkdir(parents=True, exist_ok=True)
-
-    # Try reusing cached session (token files already in directory)
-    oauth2_file = TOKENSTORE / "oauth2_token.json"
-    if oauth2_file.exists():
-        try:
-            c = garminconnect.Garmin()
-            c.login(tokenstore=str(TOKENSTORE))
-            log.info("Garmin session restored from cache")
-            return c
-        except Exception as exc:
-            log.info(f"Cached session invalid ({exc}), re-authenticating...")
-
-    # Fresh login — do NOT pass tokenstore here, save separately after
-    for attempt in range(3):
-        try:
-            c = garminconnect.Garmin(email=email, password=password)
-            c.login()
-            # Save session for future runs
-            c.garth.dump(str(TOKENSTORE))
-            log.info("Garmin login OK, session cached to /tmp/garth_tokens")
-            return c
-        except Exception as exc:
-            if attempt == 2:
-                raise
-            wait = 5 * (attempt + 1)
-            log.warning(f"Login attempt {attempt+1} failed: {exc}. Retrying in {wait}s...")
-            time.sleep(wait)
-    raise RuntimeError("Garmin login failed after retries")
+    log.info(f"Authenticating as {email[:5]}***@{email.split(\"@\")[-1]}")
+    try:
+        # Use built-in retry logic (garminconnect>=0.3)
+        c = garminconnect.Garmin(
+            email=email, password=password,
+            retry_attempts=3, retry_min_wait=10, retry_max_wait=60,
+        )
+        c.login()
+        log.info("Garmin login OK")
+        return c
+    except TypeError:
+        # Fallback for older garminconnect (<0.3) without retry params
+        c = garminconnect.Garmin(email=email, password=password)
+        c.login()
+        log.info("Garmin login OK (legacy)")
+        return c
 
 
 def sync_activities(garmin, db, user_id):
