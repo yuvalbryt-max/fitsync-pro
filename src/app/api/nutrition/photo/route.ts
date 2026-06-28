@@ -1,8 +1,8 @@
-import { createClient } from '@/lib/supabase/server'
+﻿import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 
-const genai = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY!)
+function getGenAI() { return new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY!) }
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -12,7 +12,7 @@ export async function POST(request: Request) {
   const { imageBase64, grams } = await request.json()
   if (!imageBase64) return NextResponse.json({ error: 'imageBase64 is required' }, { status: 400 })
 
-  const model = genai.getGenerativeModel({ model: 'gemini-2.0-flash' })
+  const model = getGenAI().getGenerativeModel({ model: 'gemini-2.0-flash' })
 
   const prompt = `This is a nutritional label photo. Extract the nutritional values per 100g.
 Return ONLY valid JSON (no markdown):
@@ -54,6 +54,11 @@ Return ONLY valid JSON (no markdown):
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ entry: data, per_100g: per100g }, { status: 201 })
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 })
+    const msg = String(err)
+    const isQuota = msg.includes('429') || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('exceeded')
+    if (isQuota) {
+      return NextResponse.json({ error: 'שירות ניתוח התמונה עמוס כרגע. נסה שוב בעוד מספר דקות.', code: 'QUOTA_EXCEEDED' }, { status: 503 })
+    }
+    return NextResponse.json({ error: 'שגיאה בניתוח התמונה. נסה שוב.' }, { status: 500 })
   }
 }

@@ -1,10 +1,10 @@
-import { createClient } from '@/lib/supabase/server'
+﻿import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-const genai  = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY!)
+function getOpenAI() { return new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) }
+function getGenAI()  { return new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY!) }
 
 const MAX_TEXT_LENGTH    = 1000
 const MAX_IMAGE_B64_SIZE = 5 * 1024 * 1024  // ~3.75 MB image
@@ -62,7 +62,7 @@ async function analyzeWithGPT4o(text: string, imageBase64?: string): Promise<Foo
       : prompt,
   }]
 
-  const completion = await openai.chat.completions.create({
+  const completion = await getOpenAI().chat.completions.create({
     model: 'gpt-4o', messages, max_tokens: 600,
     ...(imageBase64 ? {} : { response_format: { type: 'json_object' as const } }),
   })
@@ -70,12 +70,18 @@ async function analyzeWithGPT4o(text: string, imageBase64?: string): Promise<Foo
 }
 
 async function analyzeWithGemini(text: string, imageBase64: string): Promise<FoodItem[]> {
-  const model  = genai.getGenerativeModel({ model: 'gemini-2.0-flash' })
+  const model  = getGenAI().getGenerativeModel({ model: 'gemini-2.0-flash' })
   const prompt = `User said: "${text}"\nHere is a nutrition label. Use both text and image. Return ONLY JSON: ${JSON_SCHEMA}`
   const result = await model.generateContent([
     { inlineData: { mimeType: detectMime(imageBase64) ?? 'image/jpeg', data: imageBase64 } },
     prompt,
   ])
+  return safeParse(result.response.text())
+}
+async function analyzeWithGeminiText(text: string): Promise<FoodItem[]> {
+  const model  = getGenAI().getGenerativeModel({ model: 'gemini-2.0-flash' })
+  const prompt = `Parse this food description and return ONLY valid JSON: ${JSON_SCHEMA}\nFood description: "${text}"`
+  const result = await model.generateContent([prompt])
   return safeParse(result.response.text())
 }
 
@@ -147,7 +153,20 @@ export async function POST(request: Request) {
       items      = result.items
       confidence = result.confidence
     } else {
-      items = await analyzeWithGPT4o(text)
+      // GPT-4o primary, Gemini fallback for rate-limit resilience
+      try {
+        items = await analyzeWithGPT4o(text)
+        modelUsed = 'gpt-4o'
+      } catch (gptErr) {
+        const errMsg = String(gptErr)
+        const isRateLimit = errMsg.includes('429') || errMsg.toLowerCase().includes('quota') || errMsg.toLowerCase().includes('rate')
+        if (isRateLimit) {
+          items = await analyzeWithGeminiText(text)
+          modelUsed = 'gemini-2.0-flash'
+        } else {
+          throw gptErr
+        }
+      }
     }
 
     if (items.length === 0) {
@@ -179,7 +198,15 @@ export async function POST(request: Request) {
     }, { status: 201 })
 
   } catch (err) {
+    const msg = String(err)
     console.error('[nutrition/text]', err)
+    const isQuota = msg.includes('429') || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('exceeded')
+    if (isQuota) {
+      return NextResponse.json({
+        error: 'שירות ניתוח ה-AI עמוס כרגע. נסה שוב בעוד מספר דקות, או הוסף ידנית.',
+        code: 'QUOTA_EXCEEDED',
+      }, { status: 503 })
+    }
     return NextResponse.json({ error: 'שגיאה בניתוח המזון. נסה שוב.' }, { status: 500 })
   }
 }

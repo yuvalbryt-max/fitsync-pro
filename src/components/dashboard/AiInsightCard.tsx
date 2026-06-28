@@ -7,19 +7,22 @@ interface AiInsightCardProps {
 export default function AiInsightCard({ insight }: AiInsightCardProps) {
   if (!insight) return null
 
+  const safeHtml = insight.content
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+
   return (
-    <div className="bg-gradient-to-br from-[#120d1e] to-[#0f1a2e] border border-[#2d1a52] border-t-2 border-t-[#ec4899] rounded-2xl p-3.5 col-span-2">
-      <div className="inline-flex items-center gap-1.5 bg-[#3d0e29] border border-[#7a1040] text-[#ec4899] text-[9px] font-bold px-2 py-1 rounded-full uppercase tracking-wide mb-2">
+    <div className="bg-card border border-border border-t-2 border-t-pink rounded-2xl p-4 shadow-sm">
+      <div className="inline-flex items-center gap-1.5 bg-pink-soft text-pink text-[9px] font-bold px-2 py-1 rounded-full uppercase tracking-wide mb-2">
         ✦ AI תובנה יומית
       </div>
       <p
-        className="text-[12px] text-[#c8d4e4] leading-relaxed"
-        dangerouslySetInnerHTML={{
-          __html: insight.content.replace(
-            /\*\*(.*?)\*\*/g,
-            '<strong class="text-[#e8edf5]">$1</strong>'
-          ),
-        }}
+        className="text-[13px] text-foreground/80 leading-relaxed"
+        dangerouslySetInnerHTML={{ __html: safeHtml }}
       />
     </div>
   )

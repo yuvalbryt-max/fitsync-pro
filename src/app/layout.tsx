@@ -16,9 +16,20 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="he" dir="rtl">
       <body style={{ fontFamily: "'Heebo', system-ui, sans-serif" }}>
+        {/* Skip to main content — WCAG 2.1 Level A keyboard navigation */}
+        <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:right-2 focus:z-50 focus:bg-primary focus:text-primary-foreground focus:px-4 focus:py-2 focus:rounded-xl focus:text-sm focus:font-semibold">
+          דלג לתוכן הראשי
+        </a>
         <div className="mx-auto max-w-[430px] min-h-dvh relative bg-background">
-          {children}
+          <div id="main-content" tabIndex={-1}>
+            {children}
+          </div>
         </div>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){});})}`,
+          }}
+        />
       </body>
     </html>
   )

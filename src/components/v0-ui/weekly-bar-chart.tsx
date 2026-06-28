@@ -1,4 +1,4 @@
-import { cn } from '@/lib/utils'
+﻿import { cn } from '@/lib/utils'
 
 type Bar = {
   day: string
@@ -11,8 +11,8 @@ type WeeklyBarChartProps = {
 }
 
 export function WeeklyBarChart({ data, unit }: WeeklyBarChartProps) {
-  const max = Math.max(...data.map((d) => d.value), 1)
-  const peak = Math.max(...data.map((d) => d.value))
+  const max  = Math.max(...data.map((d) => d.value), 1)
+  const peak = max === 1 && data.every(d => d.value === 0) ? -1 : max
 
   return (
     <div className="flex h-40 items-end justify-between gap-2">

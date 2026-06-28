@@ -22,8 +22,8 @@ def main():
     since_7   = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
     log.info(f"Generating insight for {today}...")
 
-    summary  = (db.table("daily_summary").select("*").eq("user_id", user_id)
-                .eq("date", yesterday).maybeSingle().execute()).data
+    _summary_res = db.table("daily_summary").select("*").eq("user_id", user_id).eq("date", yesterday).maybe_single().execute()
+    summary = _summary_res.data if _summary_res is not None else None
     metrics  = (db.table("health_metrics").select("metric_type,value")
                 .eq("user_id", user_id).gte("recorded_at", since_7)
                 .in_("metric_type", ["hrv", "stress"]).execute()).data or []

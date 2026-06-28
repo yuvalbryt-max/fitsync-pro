@@ -11,20 +11,32 @@ from db import get_client, get_user_id, log_sync, upsert
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
-BASE    = "https://www.jefit.com/api"
+BASE    = "https://api.jefit.com"
 HEADERS = {"Content-Type": "application/json", "User-Agent": "Mozilla/5.0"}
 
 
 def login(session):
-    r = session.post(f"{BASE}/user/login",
-                     json={"loginname": os.environ["JEFIT_USERNAME"],
-                           "pwd":       os.environ["JEFIT_PASSWORD"]},
-                     headers=HEADERS, timeout=30)
-    r.raise_for_status()
-    data = r.json()
-    if not data.get("success"):
-        raise RuntimeError(f"Login failed: {data.get('message')}")
-    return data.get("userkey") or data.get("data", {}).get("userkey", "")
+    """Try login via JSON, fallback to form-encoded data."""
+    creds_json = {"loginname": os.environ["JEFIT_USERNAME"], "pwd": os.environ["JEFIT_PASSWORD"]}
+    creds_form = {"loginname": os.environ["JEFIT_USERNAME"], "password": os.environ["JEFIT_PASSWORD"]}
+    attempts = [
+        (f"{BASE}/user/login", creds_json, HEADERS),
+        (f"{BASE}/auth/login", creds_json, HEADERS),
+    ]
+    last_err = None
+    for url, body, hdrs in attempts:
+        try:
+            r = session.post(url, json=body, headers=hdrs, timeout=30)
+            if r.status_code == 404 or r.status_code == 405:
+                continue
+            r.raise_for_status()
+            data = r.json()
+            if data.get("success"):
+                return data.get("userkey") or data.get("data", {}).get("userkey", "")
+            raise RuntimeError(f"Login failed: {data.get('message')}")
+        except Exception as exc:
+            last_err = exc
+    raise RuntimeError(f"All login attempts failed: {last_err}")
 
 
 def fetch_logs(session, user_key):

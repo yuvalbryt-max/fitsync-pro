@@ -37,23 +37,44 @@ export async function POST(request: Request) {
   return NextResponse.json(data, { status: 201 })
 }
 
-export async function GET(request: Request) {
+export async function GET() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const today   = new Date().toISOString().slice(0, 10)
-  const nextDay = new Date(Date.now() + 86400000).toISOString().slice(0, 10)
+  const today = new Date()
+  const todayStr = today.toISOString().slice(0, 10)
+  const nextDay  = new Date(today)
+  nextDay.setDate(nextDay.getDate() + 1)
+  const nextDayStr = nextDay.toISOString().slice(0, 10)
+
   const { data, error } = await supabase
     .from('nutrition_entries')
     .select('*')
     .eq('user_id', user.id)
-    .gte('logged_at', today   + 'T00:00:00')
-    .lt('logged_at',  nextDay + 'T00:00:00')
+    .gte('logged_at', todayStr  + 'T00:00:00')
+    .lt('logged_at',  nextDayStr + 'T00:00:00')
     .order('logged_at', { ascending: false })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data)
 }
 
+export async function DELETE(request: Request) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const { searchParams } = new URL(request.url)
+  const id = searchParams.get('id')
+  if (!id || isNaN(Number(id))) return NextResponse.json({ error: 'id is required' }, { status: 400 })
+
+  const { error } = await supabase
+    .from('nutrition_entries')
+    .delete()
+    .eq('id', Number(id))
+    .eq('user_id', user.id)   // RLS: only own entries
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ ok: true })
+}

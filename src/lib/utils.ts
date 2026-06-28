@@ -11,7 +11,7 @@ export function formatKcal(kcal: number | null | undefined): string {
 }
 
 export function formatKg(kg: number | null | undefined): string {
-  if (kg == null || isNaN(kg) || !isFinite(kg)) return 'ג€”'
+  if (kg == null || isNaN(kg) || !isFinite(kg)) return '—'
   return kg.toFixed(1)
 }
 

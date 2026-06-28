@@ -1,5 +1,5 @@
-@import 'tailwindcss';
 @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');
+@import 'tailwindcss';
 
 /* Tailwind v4: map utility classes to CSS variables */
 @theme inline {
@@ -58,10 +58,10 @@
   --secondary:            #eef2f8;
   --secondary-foreground: #1e293b;
   --muted:                #eef2f8;
-  --muted-foreground:     #64748b;
+  --muted-foreground:     #556070;   /* darkened: 4.43→5.01:1 WCAG AA */
   --accent:               #e7eefb;
   --accent-foreground:    #1d4ed8;
-  --destructive:          #dc2626;
+  --destructive:          #c81a1a;   /* darkened: 4.49→5.26:1 WCAG AA */
   --border:               #e8edf4;
   --input:                #e8edf4;
   --ring:                 #1d4ed8;
@@ -69,13 +69,13 @@
 
   --brand:       #1d4ed8;
   --brand-soft:  #e7eefb;
-  --amber:       #d97706;
+  --amber:       #b45309;            /* darkened: 2.96→5.45:1 WCAG AA */
   --amber-soft:  #fef3e2;
-  --purple:      #7c3aed;
+  --purple:      #6d28d9;            /* darkened: 5.30→7.32:1 — higher AA */
   --purple-soft: #f5f3ff;
-  --green:       #16a34a;
+  --green:       #15803d;            /* darkened: 3.07→4.55:1 WCAG AA */
   --green-soft:  #f0fdf4;
-  --red:         #dc2626;
+  --red:         #c81a1a;            /* same as destructive */
   --red-soft:    #fef2f2;
   --pink:        #db2777;
   --pink-soft:   #fdf2f8;

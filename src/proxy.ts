@@ -1,7 +1,7 @@
-﻿import { createServerClient } from '@supabase/ssr'
+import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request })
 
   const supabase = createServerClient(
@@ -30,7 +30,7 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   const isAuthRoute = request.nextUrl.pathname.startsWith('/auth')
-  const isApiRoute = request.nextUrl.pathname.startsWith('/api')
+  const isApiRoute  = request.nextUrl.pathname.startsWith('/api')
 
   if (!user && !isAuthRoute && !isApiRoute) {
     return NextResponse.redirect(new URL('/auth/login', request.url))
@@ -48,4 +48,3 @@ export const config = {
     '/((?!_next/static|_next/image|favicon.ico|manifest.json|icons|sw\\.js).*)',
   ],
 }
-

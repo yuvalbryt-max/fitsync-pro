@@ -1,4 +1,4 @@
-﻿import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { cn, formatKcal, formatKg, todayStr, daysAgo, nextDayStr } from '@/lib/utils'
 
 describe('cn', () => {
@@ -10,7 +10,6 @@ describe('cn', () => {
 describe('formatKcal', () => {
   it('hebrew locale separator for 2050', () => expect(formatKcal(2050)).toBe('2,050'))
   it('hebrew locale negative format', () => expect(formatKcal(-350)).toContain('350'))
-  // Edge cases added in Phase 3
   it('returns "0" for null',             () => expect(formatKcal(null)).toBe('0'))
   it('returns "0" for undefined',        () => expect(formatKcal(undefined)).toBe('0'))
   it('returns "0" for NaN',              () => expect(formatKcal(NaN)).toBe('0'))
@@ -23,15 +22,13 @@ describe('formatKcal', () => {
 describe('formatKg', () => {
   it('one decimal',                      () => expect(formatKg(79.2)).toBe('79.2'))
   it('rounds to one decimal place',      () => expect(formatKg(79.25)).toBe('79.3'))
-  // Edge cases added in Phase 3
-  it('returns "ג€”" for null',             () => expect(formatKg(null)).toBe('ג€”'))
-  it('returns "ג€”" for undefined',        () => expect(formatKg(undefined)).toBe('ג€”'))
-  it('returns "ג€”" for NaN',             () => expect(formatKg(NaN)).toBe('ג€”'))
-  it('returns "ג€”" for Infinity',        () => expect(formatKg(Infinity)).toBe('ג€”'))
+  it('returns "—" for null',             () => expect(formatKg(null)).toBe('—'))
+  it('returns "—" for undefined',        () => expect(formatKg(undefined)).toBe('—'))
+  it('returns "—" for NaN',             () => expect(formatKg(NaN)).toBe('—'))
+  it('returns "—" for Infinity',        () => expect(formatKg(Infinity)).toBe('—'))
   it('handles zero correctly',           () => expect(formatKg(0)).toBe('0.0'))
   it('handles negative weight',          () => expect(formatKg(-1.5)).toBe('-1.5'))
 })
-
 
 describe('todayStr', () => {
   it('returns a string in YYYY-MM-DD format', () => {
@@ -76,4 +73,3 @@ describe('nextDayStr', () => {
     expect(nextDayStr('2024-06-15')).toMatch(/^\d{4}-\d{2}-\d{2}$/)
   })
 })
-

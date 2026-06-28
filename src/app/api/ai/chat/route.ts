@@ -1,8 +1,8 @@
-import { createClient } from '@/lib/supabase/server'
+﻿import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+function getAnthropic() { return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY }) }
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -20,7 +20,6 @@ export async function POST(request: Request) {
 
   const today = new Date().toISOString().slice(0, 10)
 
-  // Fetch context — only load history when session exists (null = new session)
   const [summaryRes, insightRes, recentMsgsRes] = await Promise.all([
     supabase.from('daily_summary').select('*').eq('user_id', user.id).eq('date', today).maybeSingle(),
     supabase.from('ai_insights').select('content,insight_date').eq('user_id', user.id)
@@ -31,11 +30,10 @@ export async function POST(request: Request) {
       : Promise.resolve({ data: [] }),
   ])
 
-  const summary      = summaryRes.data
-  const insights     = insightRes.data || []
-  const recentMsgs   = (recentMsgsRes.data || []).reverse()
+  const summary    = summaryRes.data
+  const insights   = insightRes.data || []
+  const recentMsgs = (recentMsgsRes.data || []).reverse()
 
-  // Build system prompt with user context
   const systemPrompt = `אתה מאמן כושר ותזונה אישי חכם. אתה מדבר בעברית.
 אתה מכיר את הנתונים של המשתמש ומשתמש בהם בתשובות שלך.
 
@@ -50,14 +48,13 @@ ${insights.length ? `תובנות אחרונות:\n${insights.map(i => `• ${i.
 
 ענה בתמציתיות. השתמש ב-**bold** לנתונים חשובים. אם שואלים על קלוריות, תן מספרים מדויקים.`
 
-  // Build messages array
   const messages: { role: 'user' | 'assistant'; content: string }[] = [
     ...recentMsgs.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
     { role: 'user', content: message },
   ]
 
   try {
-    const response = await anthropic.messages.create({
+    const response = await getAnthropic().messages.create({
       model:      'claude-sonnet-4-6',
       max_tokens: 500,
       system:     systemPrompt,
@@ -77,7 +74,10 @@ ${insights.length ? `תובנות אחרונות:\n${insights.map(i => `• ${i.
     return NextResponse.json({ reply: assistantContent, session_id: sid })
   } catch (err) {
     console.error('[ai/chat POST]', err)
-    return NextResponse.json({ error: 'שגיאה בתקשורת עם ה-AI. נסה שוב.' }, { status: 500 })
+    const isQuota = String(err).includes('429') || String(err).toLowerCase().includes('quota')
+    return NextResponse.json({
+      error: isQuota ? 'שירות ה-AI עמוס כרגע. נסה שוב בעוד דקה.' : 'שגיאה בתקשורת עם ה-AI. נסה שוב.',
+    }, { status: isQuota ? 503 : 500 })
   }
 }
 

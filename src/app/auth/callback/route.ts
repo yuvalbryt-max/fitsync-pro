@@ -1,14 +1,13 @@
-﻿import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
-const ALLOWED_ORIGIN = process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL
-  ? `https://${process.env.VERCEL_URL}`
-  : 'http://localhost:3000'
+// Fallback chain: explicit site URL → Vercel auto URL → localhost for dev
+const ORIGIN =
+  process.env.NEXT_PUBLIC_SITE_URL
+  || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
-  // Use env-configured origin to prevent open redirect via Host header spoofing
-  const origin = process.env.NEXT_PUBLIC_SITE_URL || ALLOWED_ORIGIN
   const code = searchParams.get('code')
 
   if (code) {
@@ -17,7 +16,7 @@ export async function GET(request: Request) {
     if (!error && data.user) {
       const email = data.user.email
       if (!email) {
-        return NextResponse.redirect(`${origin}/auth/login?error=no_email`)
+        return NextResponse.redirect(`${ORIGIN}/auth/login?error=no_email`)
       }
       try {
         await supabase.from('users').upsert(
@@ -27,10 +26,8 @@ export async function GET(request: Request) {
       } catch {
         // Profile upsert failure is non-fatal — user is authenticated; profile created lazily
       }
-      return NextResponse.redirect(`${origin}/`)
+      return NextResponse.redirect(`${ORIGIN}/`)
     }
   }
-  return NextResponse.redirect(`${origin}/auth/login?error=auth_failed`)
+  return NextResponse.redirect(`${ORIGIN}/auth/login?error=auth_failed`)
 }
-
-

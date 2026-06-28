@@ -1,31 +1,16 @@
-﻿[build]
+[build]
 builder = "nixpacks"
 buildCommand = "pip install -r requirements.txt"
 
+# Single cron service that runs all workers sequentially via run_all.py.
+# If one worker fails it is logged — the container does NOT crash.
 [[services]]
-name = "garmin-sync"
-startCommand = "python garmin_sync.py"
+name = "fitsync-sync"
+startCommand = "python run_all.py"
 
 [services.deploy]
-cronSchedule = "0 4,11,18 * * *"
+cronSchedule = "0 4,11,18 * * *"   # 07:00, 14:00, 21:00 Israel (04:00, 11:00, 18:00 UTC)
 
-[[services]]
-name = "jefit-sync"
-startCommand = "python jefit_sync.py"
-
-[services.deploy]
-cronSchedule = "10 4,11,18 * * *"
-
-[[services]]
-name = "daily-summary"
-startCommand = "python daily_summary.py"
-
-[services.deploy]
-cronSchedule = "15 18 * * *"
-
-[[services]]
-name = "ai-insight"
-startCommand = "python ai_insight.py"
-
-[services.deploy]
-cronSchedule = "30 4 * * *"
+# IMPORTANT: Add a Railway Volume mounted at /data/garth_tokens for Garmin auth.
+# First run: set GARMIN_TOKENSTORE=/data/garth_tokens — tokens persist across restarts.
+# Without a Volume, Garmin re-authenticates each run (429 risk).

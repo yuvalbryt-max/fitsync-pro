@@ -1,20 +1,20 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { AppHeader } from '@/components/v0-ui/app-header'
-import { BottomNav } from '@/components/v0-ui/bottom-nav'
-import { LineChart } from '@/components/v0-ui/line-chart'
-import { WeeklyBarChart } from '@/components/v0-ui/weekly-bar-chart'
+import { AppHeader }           from '@/components/v0-ui/app-header'
+import { BottomNav }           from '@/components/v0-ui/bottom-nav'
+import { LineChart }           from '@/components/v0-ui/line-chart'
+import { WeeklyBarChart }      from '@/components/v0-ui/weekly-bar-chart'
 import { CalorieBalanceChart } from '@/components/v0-ui/calorie-balance-chart'
+import { daysAgo }             from '@/lib/utils'
 
 export default async function AnalyticsPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
 
-  const monthAgo = new Date(Date.now() - 29 * 86400000).toISOString().slice(0, 10)
-  const weekAgo  = new Date(Date.now() - 6  * 86400000).toISOString().slice(0, 10)
+  const monthAgo = daysAgo(29)
+  const weekAgo  = daysAgo(6)
 
-  // Fix: table is body_metrics (not body_weights), column is measured_at (not recorded_at)
   const [{ data: weightsRaw }, { data: summariesRaw }, { data: metricsRaw }] = await Promise.all([
     supabase.from('body_metrics').select('weight_kg,measured_at').eq('user_id', user.id)
       .gte('measured_at', monthAgo).order('measured_at'),
@@ -25,8 +25,10 @@ export default async function AnalyticsPage() {
   ])
 
   const dayNames = ['א','ב','ג','ד','ה','ו','ש']
+
   const weekBars = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(Date.now() - (6 - i) * 86400000)
+    const d = new Date()
+    d.setDate(d.getDate() - (6 - i))
     const ds = (summariesRaw || []).find(s => s.date === d.toISOString().slice(0, 10))
     return {
       day: dayNames[d.getDay()],
@@ -35,24 +37,27 @@ export default async function AnalyticsPage() {
   })
 
   const calBalance = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(Date.now() - (6 - i) * 86400000)
+    const d = new Date()
+    d.setDate(d.getDate() - (6 - i))
     const ds = (summariesRaw || []).find(s => s.date === d.toISOString().slice(0, 10))
     if (!ds) return { day: dayNames[d.getDay()], value: 0 }
     return { day: dayNames[d.getDay()], value: (ds.consumed_kcal || 0) - (ds.active_kcal || 0) - 2000 }
   })
 
   const weights = (weightsRaw || []).map(w => Number(w.weight_kg))
-  // Fix: use measured_at (correct column) for date labels
   const weightLabels = weightsRaw && weightsRaw.length > 0
-    ? [new Date(weightsRaw[0].measured_at).toLocaleDateString('he-IL', { day: 'numeric', month: 'short' }),
-       new Date(weightsRaw[weightsRaw.length - 1].measured_at).toLocaleDateString('he-IL', { day: 'numeric', month: 'short' })]
+    ? [
+        new Date(weightsRaw[0].measured_at).toLocaleDateString('he-IL', { day: 'numeric', month: 'short' }),
+        new Date(weightsRaw[weightsRaw.length - 1].measured_at).toLocaleDateString('he-IL', { day: 'numeric', month: 'short' }),
+      ]
     : []
 
   const hrvData = (metricsRaw || []).map(m => Number(m.value))
   const latestWeight = weights.length > 0 ? weights[weights.length - 1] : null
-  const weightChange = weights.length > 1 ? (weights[weights.length - 1] - weights[0]).toFixed(1) : null
+  const weightChange = weights.length > 1
+    ? (weights[weights.length - 1] - weights[0]).toFixed(1)
+    : null
 
-  // Fix: only average days that actually have data (not divide by 7 if only 3 days exist)
   const summariesWithData = (summariesRaw || []).filter(d => d.consumed_kcal > 0 || d.active_kcal > 0)
   const avgCalories = summariesWithData.length > 0
     ? Math.round(summariesWithData.reduce((s, d) => s + (d.consumed_kcal || 0), 0) / summariesWithData.length)
@@ -67,7 +72,7 @@ export default async function AnalyticsPage() {
 
       <main className="flex flex-col gap-4 px-4 py-4 pb-6 flex-1">
 
-        {/* Weight trend */}
+        {/* מגמת משקל */}
         <section className="rounded-3xl bg-card p-4 shadow-sm">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-bold text-foreground">מגמת משקל</h2>
@@ -97,7 +102,7 @@ export default async function AnalyticsPage() {
         {hrvData.length > 1 && (
           <section className="rounded-3xl bg-card p-4 shadow-sm">
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-bold text-foreground">HRV שינויות</h2>
+              <h2 className="text-sm font-bold text-foreground">HRV שינויים</h2>
               <span className="rounded-full bg-purple-soft px-2.5 py-1 text-[11px] font-semibold text-purple">
                 30 יום
               </span>
@@ -106,7 +111,7 @@ export default async function AnalyticsPage() {
           </section>
         )}
 
-        {/* Weekly activity bars */}
+        {/* פעילות שבועית */}
         <section className="rounded-3xl bg-card p-4 shadow-sm">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-bold text-foreground">פעילות שבועית</h2>
@@ -117,19 +122,23 @@ export default async function AnalyticsPage() {
           <WeeklyBarChart data={weekBars} />
         </section>
 
-        {/* Calorie balance */}
+        {/* מאזן קלורי */}
         <section className="rounded-3xl bg-card p-4 shadow-sm">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-bold text-foreground">מאזן קלורי</h2>
-            <div className="flex items-center gap-3 text-[11px] font-medium">
-              <span className="flex items-center gap-1"><span className="inline-block h-2 w-2 rounded-full bg-green"/>גירעון</span>
-              <span className="flex items-center gap-1"><span className="inline-block h-2 w-2 rounded-full bg-red"/>עודף</span>
+            <div className="flex items-center gap-3 text-[11px] font-medium text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <span className="inline-block h-2 w-2 rounded-full bg-green"/>גירעון
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="inline-block h-2 w-2 rounded-full bg-red"/>עודף
+              </span>
             </div>
           </div>
           <CalorieBalanceChart data={calBalance} />
         </section>
 
-        {/* Weekly summary */}
+        {/* סיכום שבועי */}
         <section className="rounded-3xl bg-card p-4 shadow-sm">
           <h2 className="mb-3 text-sm font-bold text-foreground">סיכום שבועי</h2>
           <div className="grid grid-cols-2 gap-3">
